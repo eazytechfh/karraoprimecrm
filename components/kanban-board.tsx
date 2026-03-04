@@ -57,11 +57,13 @@ import { toast } from "@/components/ui/use-toast" // Added toast for notificatio
 
 const COLUNAS_KANBAN = ["novo_lead", "em_qualificacao", "transferido", "vendedor", "follow_up"]
 const MOTIVOS_LEAD = [
+  "Nenhum motivo",
   "Desistência cliente",
   "Ficha não aprova",
   "Comprou em outra loja",
   "Não gostou do carro",
   "Não vai comprar agora",
+  "Outros Motivos",
 ]
 const MOTIVO_PREFIX = "[Motivo] "
 
@@ -103,6 +105,15 @@ export function KanbanBoard() {
   }
 
   const upsertMotivoInObservacao = (observacao: string | undefined, motivo: string) => {
+    if (motivo === "Nenhum motivo") {
+      return (observacao || "")
+        .split("\n")
+        .map((line) => line.trimEnd())
+        .filter((line) => line.trim() && !line.trim().toLowerCase().startsWith(MOTIVO_PREFIX.toLowerCase()))
+        .join("\n")
+        .trim()
+    }
+
     const linhasSemMotivo = (observacao || "")
       .split("\n")
       .map((line) => line.trimEnd())
@@ -585,7 +596,7 @@ export function KanbanBoard() {
       return
     }
 
-    setSelectedMotivo(motivo)
+    setSelectedMotivo(motivo === "Nenhum motivo" ? "" : motivo)
     setLeads((prev) =>
       prev.map((lead) => (lead.id === selectedLead.id ? { ...lead, observacao_vendedor: novaObservacao } : lead)),
     )
@@ -597,7 +608,7 @@ export function KanbanBoard() {
 
     toast({
       title: "Motivo salvo",
-      description: motivo,
+      description: motivo === "Nenhum motivo" ? "Motivo removido." : motivo,
     })
   }
 
