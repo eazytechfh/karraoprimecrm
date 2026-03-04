@@ -94,6 +94,60 @@ export function KanbanBoard() {
     setLoading(false)
   }
 
+  const ensureAgendamentoForLead = async (lead: Partial<Lead> & { id: number }, vendedorOverride?: string) => {
+    const supabase = createClient()
+    const vendedor = vendedorOverride ?? lead.vendedor
+
+    if (!vendedor) return
+
+    const { data: existingAgendamento, error: existingError } = await supabase
+      .from("AGENDAMENTOS")
+      .select("id, vendedor")
+      .eq("id_lead", lead.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (existingError) {
+      console.error("[v0] Error checking existing agendamento:", existingError)
+      return
+    }
+
+    if (existingAgendamento) {
+      const { error: updateError } = await supabase
+        .from("AGENDAMENTOS")
+        .update({
+          vendedor,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", existingAgendamento.id)
+
+      if (updateError) {
+        console.error("[v0] Error updating agendamento vendedor:", updateError)
+      }
+      return
+    }
+
+    const user = getCurrentUser()
+    const { error: insertError } = await supabase.from("AGENDAMENTOS").insert({
+      id_empresa: user?.id_empresa,
+      id_lead: lead.id,
+      nome_lead: lead.nome_lead || "Lead sem nome",
+      telefone: lead.telefone || null,
+      email: lead.email || null,
+      modelo_veiculo: lead.veiculo_interesse || null,
+      vendedor,
+      sdr_responsavel: lead.sdr_responsavel || null,
+      estagio_agendamento: "agendar",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+
+    if (insertError) {
+      console.error("[v0] Error creating agendamento for lead:", insertError)
+    }
+  }
+
   const filterLeads = () => {
     let filtered = [...leads]
 
@@ -190,7 +244,8 @@ export function KanbanBoard() {
       } else {
         console.log("Lead moved successfully")
 
-        if (newStage === "transferido" && leadData) {
+        if ((newStage === "transferido" || newStage === "vendedor") && leadData) {
+          await ensureAgendamentoForLead(leadData)
           setResumoMessage({
             type: "success",
             text: "Lead transferido com sucesso! Um novo agendamento foi criado na aba Agendamentos.",
@@ -511,6 +566,8 @@ export function KanbanBoard() {
             updated_at: new Date().toISOString(),
           })
           .eq("id", leadToTransfer.id)
+
+        await ensureAgendamentoForLead(leadToTransfer, selectedVendedor)
 
         // Update the lead's vendedor and stage in local state
         setLeads((prevLeads) =>
