@@ -6,6 +6,12 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
   Phone,
   Mail,
   Calendar,
@@ -21,6 +27,7 @@ import {
   Move,
   Edit,
   Save,
+  ChevronDown,
 } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { LeadsListView } from "./leads-list-view"
@@ -34,6 +41,7 @@ import type { Lead } from "@/types/lead"
 import {
   getLeads,
   updateLeadStage,
+  updateLeadObservacao,
   generateResumoComercial,
   sendPesquisaAtendimentoWebhook,
   deleteLead,
@@ -48,6 +56,14 @@ import { Input } from "@/components/ui/input" // Added Input component
 import { toast } from "@/components/ui/use-toast" // Added toast for notifications
 
 const COLUNAS_KANBAN = ["novo_lead", "em_qualificacao", "transferido", "vendedor", "follow_up"]
+const MOTIVOS_LEAD = [
+  "Desistência cliente",
+  "Ficha não aprova",
+  "Comprou em outra loja",
+  "Não gostou do carro",
+  "Não vai comprar agora",
+]
+const MOTIVO_PREFIX = "[Motivo] "
 
 export function KanbanBoard() {
   const [leads, setLeads] = useState<Lead[]>([])
@@ -76,6 +92,24 @@ export function KanbanBoard() {
   const [editedLead, setEditedLead] = useState<any>(null)
   const [availableSDRs, setAvailableSDRs] = useState<any[]>([])
   const [availableVendedores, setAvailableVendedores] = useState<any[]>([])
+  const [selectedMotivo, setSelectedMotivo] = useState<string>("")
+
+  const extractMotivo = (observacao?: string) => {
+    if (!observacao) return ""
+    const motivoLine = observacao
+      .split("\n")
+      .find((line) => line.trim().toLowerCase().startsWith(MOTIVO_PREFIX.toLowerCase()))
+    return motivoLine ? motivoLine.replace(MOTIVO_PREFIX, "").trim() : ""
+  }
+
+  const upsertMotivoInObservacao = (observacao: string | undefined, motivo: string) => {
+    const linhasSemMotivo = (observacao || "")
+      .split("\n")
+      .map((line) => line.trimEnd())
+      .filter((line) => line.trim() && !line.trim().toLowerCase().startsWith(MOTIVO_PREFIX.toLowerCase()))
+
+    return [`${MOTIVO_PREFIX}${motivo}`, ...linhasSemMotivo].join("\n").trim()
+  }
 
   useEffect(() => {
     loadLeads()
@@ -84,6 +118,10 @@ export function KanbanBoard() {
   useEffect(() => {
     filterLeads()
   }, [leads, searchTerm, filterOrigem, filterEstagio])
+
+  useEffect(() => {
+    setSelectedMotivo(extractMotivo(selectedLead?.observacao_vendedor))
+  }, [selectedLead])
 
   const loadLeads = async () => {
     const user = getCurrentUser()
@@ -530,6 +568,37 @@ export function KanbanBoard() {
     setSelectedVendedor("")
     setShowConfirmation(false)
     loadVendedores()
+  }
+
+  const handleSelectMotivo = async (motivo: string) => {
+    if (!selectedLead) return
+
+    const novaObservacao = upsertMotivoInObservacao(selectedLead.observacao_vendedor, motivo)
+    const success = await updateLeadObservacao(selectedLead.id, novaObservacao)
+
+    if (!success) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível salvar o motivo.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setSelectedMotivo(motivo)
+    setLeads((prev) =>
+      prev.map((lead) => (lead.id === selectedLead.id ? { ...lead, observacao_vendedor: novaObservacao } : lead)),
+    )
+    setSelectedLead({ ...selectedLead, observacao_vendedor: novaObservacao })
+
+    if (editedLead && editedLead.id === selectedLead.id) {
+      setEditedLead({ ...editedLead, observacao_vendedor: novaObservacao })
+    }
+
+    toast({
+      title: "Motivo salvo",
+      description: motivo,
+    })
   }
 
   const handleVendedorSelected = () => {
@@ -992,6 +1061,22 @@ export function KanbanBoard() {
                   </div>
                   {selectedLead && (
                     <div className="flex gap-2">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" size="sm" className="flex items-center gap-2 bg-white">
+                            Motivos
+                            {selectedMotivo && <span className="max-w-[160px] truncate text-xs">({selectedMotivo})</span>}
+                            <ChevronDown className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start" className="w-64">
+                          {MOTIVOS_LEAD.map((motivo) => (
+                            <DropdownMenuItem key={motivo} onClick={() => handleSelectMotivo(motivo)}>
+                              {motivo}
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                       {/* Edit Lead button */}
                       <Button
                         variant="default"
