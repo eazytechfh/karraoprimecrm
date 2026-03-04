@@ -215,6 +215,8 @@ export function AgendamentosKanban() {
     observacoes: "",
     observacoes_vendedor: "", // Novo campo
     email: "", // Novo campo
+    ganho: false,
+    realizou_visita: false,
   })
 
   const [editedAgendamento, setEditedAgendamento] = useState<{
@@ -530,6 +532,9 @@ export function AgendamentosKanban() {
   }
 
   const handleOpenAgendamento = async (agendamento: Agendamento) => {
+    const isGanho = agendamento.estagio_agendamento === "fechou"
+    const isRealizouVisita = agendamento.estagio_agendamento === "realizou_visita" || isGanho
+
     setSelectedAgendamento(agendamento)
     setFormData({
       modelo_veiculo: agendamento.modelo_veiculo || "",
@@ -539,6 +544,8 @@ export function AgendamentosKanban() {
       observacoes: agendamento.observacoes || "",
       observacoes_vendedor: agendamento.observacoes_vendedor || "",
       email: agendamento.email || "", // Novo campo
+      ganho: isGanho,
+      realizou_visita: isRealizouVisita,
     })
 
     setLoadingHistorico(true)
@@ -577,7 +584,11 @@ export function AgendamentosKanban() {
         updates.vendedor &&
         selectedAgendamento.estagio_agendamento === "agendar"
 
-      if (hasRequiredFields) {
+      if (formData.ganho) {
+        updates.estagio_agendamento = "fechou"
+      } else if (formData.realizou_visita) {
+        updates.estagio_agendamento = "realizou_visita"
+      } else if (hasRequiredFields) {
         updates.estagio_agendamento = "agendado"
       }
 
@@ -1238,6 +1249,41 @@ export function AgendamentosKanban() {
                       disabled={!canEdit}
                       rows={2}
                     />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 rounded border-gray-300"
+                        checked={formData.realizou_visita}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            realizou_visita: e.target.checked,
+                            ganho: e.target.checked ? prev.ganho : false,
+                          }))
+                        }
+                        disabled={!canEdit}
+                      />
+                      Realizou Visita
+                    </label>
+                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 rounded border-gray-300"
+                        checked={formData.ganho}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            ganho: e.target.checked,
+                            realizou_visita: e.target.checked ? true : prev.realizou_visita,
+                          }))
+                        }
+                        disabled={!canEdit}
+                      />
+                      Ganho
+                    </label>
                   </div>
 
                   <div>

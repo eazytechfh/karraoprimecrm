@@ -303,6 +303,8 @@ export default function HistoricoVisitasPage() {
                     <TableHead>SDR Responsável</TableHead>
                     <TableHead>Data da Venda</TableHead>
                     <TableHead>Data Agendamento</TableHead>
+                    <TableHead>Realizou Visita</TableHead>
+                    <TableHead>Ganho</TableHead>
                     <TableHead>Status Final</TableHead>
                     <TableHead>Última Atualização</TableHead>
                     {filteredHistorico.some((h) => h.motivo_perda) && <TableHead>Motivo</TableHead>}
@@ -311,6 +313,12 @@ export default function HistoricoVisitasPage() {
                 <TableBody>
                   {filteredHistorico.map((visita) => (
                     <TableRow key={visita.id}>
+                      {(() => {
+                        const realizouVisita =
+                          visita.estagio_agendamento === "realizou_visita" || visita.estagio_agendamento === "fechou"
+                        const ganhou = visita.estagio_agendamento === "fechou"
+                        return (
+                          <>
                       <TableCell className="font-medium">{visita.nome_lead}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1 text-sm text-gray-600">
@@ -357,6 +365,16 @@ export default function HistoricoVisitasPage() {
                           "-"
                         )}
                       </TableCell>
+                      <TableCell>
+                        <Badge className={realizouVisita ? "bg-purple-100 text-purple-800" : "bg-gray-100 text-gray-700"}>
+                          {realizouVisita ? "Sim" : "Não"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={ganhou ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-700"}>
+                          {ganhou ? "Sim" : "Não"}
+                        </Badge>
+                      </TableCell>
                       <TableCell>{getStatusBadge(visita.estagio_agendamento)}</TableCell>
                       <TableCell className="text-sm text-gray-600">{formatDate(visita.updated_at)}</TableCell>
                       {filteredHistorico.some((h) => h.motivo_perda) && (
@@ -370,6 +388,9 @@ export default function HistoricoVisitasPage() {
                           )}
                         </TableCell>
                       )}
+                          </>
+                        )
+                      })()}
                     </TableRow>
                   ))}
                 </TableBody>
