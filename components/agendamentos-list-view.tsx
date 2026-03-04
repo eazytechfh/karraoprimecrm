@@ -71,6 +71,8 @@ export function AgendamentosListView() {
     hora_agendamento: "",
     id_vendedor: "",
     observacoes: "",
+    realizou_visita: false,
+    ganho: false,
   })
 
   useEffect(() => {
@@ -276,6 +278,9 @@ export function AgendamentosListView() {
   }
 
   const handleOpenAgendamento = (agendamento: Agendamento) => {
+    const isGanho = agendamento.estagio_agendamento === "fechou"
+    const isRealizouVisita = agendamento.estagio_agendamento === "realizou_visita" || isGanho
+
     setSelectedAgendamento(agendamento)
     setFormData({
       modelo_veiculo: agendamento.modelo_veiculo || "",
@@ -283,11 +288,20 @@ export function AgendamentosListView() {
       hora_agendamento: agendamento.hora_agendamento || "",
       id_vendedor: agendamento.id_vendedor?.toString() || "",
       observacoes: agendamento.observacoes || "",
+      realizou_visita: isRealizouVisita,
+      ganho: isGanho,
     })
   }
 
   const handleSaveAgendamento = async () => {
     if (!selectedAgendamento) return
+
+    let estagio_agendamento = selectedAgendamento.estagio_agendamento
+    if (formData.ganho) {
+      estagio_agendamento = "fechou"
+    } else if (formData.realizou_visita) {
+      estagio_agendamento = "realizou_visita"
+    }
 
     await updateAgendamento(selectedAgendamento.id, {
       modelo_veiculo: formData.modelo_veiculo,
@@ -296,6 +310,7 @@ export function AgendamentosListView() {
       id_vendedor: formData.id_vendedor ? Number.parseInt(formData.id_vendedor) : undefined,
       vendedor: vendedores.find((v) => v.id.toString() === formData.id_vendedor)?.nome_usuario,
       observacoes: formData.observacoes,
+      estagio_agendamento,
     })
 
     await loadData()
@@ -735,6 +750,42 @@ export function AgendamentosListView() {
                   rows={3}
                   disabled={!userCanEdit && !isSdr}
                 />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-gray-300"
+                    checked={formData.realizou_visita}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        realizou_visita: e.target.checked,
+                        ganho: e.target.checked ? prev.ganho : false,
+                      }))
+                    }
+                    disabled={!userCanEdit && !isSdr}
+                  />
+                  Realizou Visita
+                </label>
+
+                <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-gray-300"
+                    checked={formData.ganho}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        ganho: e.target.checked,
+                        realizou_visita: e.target.checked ? true : prev.realizou_visita,
+                      }))
+                    }
+                    disabled={!userCanEdit && !isSdr}
+                  />
+                  Ganho
+                </label>
               </div>
 
               {selectedAgendamento.data_agendamento && selectedAgendamento.hora_agendamento && (
