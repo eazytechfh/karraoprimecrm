@@ -146,6 +146,7 @@ export function DashboardCharts() {
                   <SelectValue placeholder="Selecione o período" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="hoje">📍 Hoje</SelectItem>
                   <SelectItem value="7d">📅 Últimos 7 dias</SelectItem>
                   <SelectItem value="30d">📊 Últimos 30 dias</SelectItem>
                   <SelectItem value="90d">📈 Últimos 90 dias</SelectItem>

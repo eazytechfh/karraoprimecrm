@@ -55,6 +55,9 @@ function getStartDateFromPeriodo(periodo?: string) {
   const startDate = new Date()
 
   switch (periodo) {
+    case "hoje":
+      startDate.setHours(0, 0, 0, 0)
+      break
     case "7d":
       startDate.setDate(now.getDate() - 7)
       break
