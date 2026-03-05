@@ -31,6 +31,8 @@ export default function HistoricoVisitasPage() {
     vendedor: "",
     sdr: "", // Added SDR filter
     status: "", // Added status filter
+    realizouVisita: "",
+    ganho: "",
     dataInicio: "",
     dataFim: "",
   })
@@ -87,6 +89,20 @@ export default function HistoricoVisitasPage() {
       )
     }
 
+    if (filters.realizouVisita) {
+      filtered = filtered.filter((h) => {
+        const realizouVisita = h.estagio_agendamento === "realizou_visita" || h.estagio_agendamento === "fechou"
+        return filters.realizouVisita === "sim" ? realizouVisita : !realizouVisita
+      })
+    }
+
+    if (filters.ganho) {
+      filtered = filtered.filter((h) => {
+        const ganhou = h.estagio_agendamento === "fechou"
+        return filters.ganho === "sim" ? ganhou : !ganhou
+      })
+    }
+
     setFilteredHistorico(filtered)
   }
 
@@ -104,6 +120,8 @@ export default function HistoricoVisitasPage() {
       vendedor: "",
       sdr: "", // Added SDR to clear
       status: "", // Added status to clear
+      realizouVisita: "",
+      ganho: "",
       dataInicio: "",
       dataFim: "",
     })
@@ -140,7 +158,7 @@ export default function HistoricoVisitasPage() {
 
   useEffect(() => {
     filterHistorico()
-  }, [historico, searchTerm])
+  }, [historico, searchTerm, filters.realizouVisita, filters.ganho])
 
   if (loading) {
     return (
@@ -255,6 +273,32 @@ export default function HistoricoVisitasPage() {
                   <SelectItem value="agendar">Não Realizou Visita (Reagendada)</SelectItem>
                   <SelectItem value="fechou">Fechou</SelectItem>
                   <SelectItem value="nao_fechou">Não Fechou</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">Realizou Visita</label>
+              <Select value={filters.realizouVisita} onValueChange={(value) => handleFilterChange("realizouVisita", value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Todos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="sim">Sim</SelectItem>
+                  <SelectItem value="nao">Não</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">Ganho</label>
+              <Select value={filters.ganho} onValueChange={(value) => handleFilterChange("ganho", value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Todos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="sim">Sim</SelectItem>
+                  <SelectItem value="nao">Não</SelectItem>
                 </SelectContent>
               </Select>
             </div>
