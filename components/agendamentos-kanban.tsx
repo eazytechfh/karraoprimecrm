@@ -1219,38 +1219,6 @@ export function AgendamentosKanban() {
                     />
                   </div>
 
-                  <div>
-                    <label className="text-sm font-medium text-gray-700">Vendedor</label>
-                    <Select
-                      value={editedAgendamento.vendedor ?? selectedAgendamento.vendedor ?? ""}
-                      onValueChange={(value) => handleFieldChange("vendedor", value)}
-                      disabled={!canEdit}
-                    >
-                      <SelectTrigger className="mt-1">
-                        <SelectValue placeholder="Selecione um vendedor" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {vendedores.map((v) => (
-                          <SelectItem key={v.id} value={v.nome_usuario}>
-                            {v.nome_usuario}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <label className="text-sm font-medium text-gray-700">Observações</label>
-                    <Textarea
-                      placeholder="Adicione observações"
-                      value={editedAgendamento.observacoes ?? selectedAgendamento.observacoes ?? ""}
-                      onChange={(e) => handleFieldChange("observacoes", e.target.value)}
-                      className="mt-1"
-                      disabled={!canEdit}
-                      rows={2}
-                    />
-                  </div>
-
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
                       <input
@@ -1284,6 +1252,38 @@ export function AgendamentosKanban() {
                       />
                       Ganho
                     </label>
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Vendedor</label>
+                    <Select
+                      value={editedAgendamento.vendedor ?? selectedAgendamento.vendedor ?? ""}
+                      onValueChange={(value) => handleFieldChange("vendedor", value)}
+                      disabled={!canEdit}
+                    >
+                      <SelectTrigger className="mt-1">
+                        <SelectValue placeholder="Selecione um vendedor" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {vendedores.map((v) => (
+                          <SelectItem key={v.id} value={v.nome_usuario}>
+                            {v.nome_usuario}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Observações</label>
+                    <Textarea
+                      placeholder="Adicione observações"
+                      value={editedAgendamento.observacoes ?? selectedAgendamento.observacoes ?? ""}
+                      onChange={(e) => handleFieldChange("observacoes", e.target.value)}
+                      className="mt-1"
+                      disabled={!canEdit}
+                      rows={2}
+                    />
                   </div>
 
                   <div>

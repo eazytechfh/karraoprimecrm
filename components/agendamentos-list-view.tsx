@@ -721,37 +721,6 @@ export function AgendamentosListView() {
                 </div>
               </div>
 
-              <div>
-                <label className="text-sm font-medium text-gray-700">Vendedor</label>
-                <Select
-                  value={formData.id_vendedor}
-                  onValueChange={(value) => setFormData({ ...formData, id_vendedor: value })}
-                  disabled={!userCanEdit && !isSdr}
-                >
-                  <SelectTrigger className="mt-1">
-                    <SelectValue placeholder="Selecione o vendedor" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {vendedores.map((v) => (
-                      <SelectItem key={v.id} value={v.id.toString()}>
-                        {v.nome_usuario}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-gray-700">Observações</label>
-                <Textarea
-                  value={formData.observacoes}
-                  onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
-                  className="mt-1 w-full rounded-md border border-gray-300 p-2 text-sm"
-                  rows={3}
-                  disabled={!userCanEdit && !isSdr}
-                />
-              </div>
-
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
                   <input
@@ -786,6 +755,37 @@ export function AgendamentosListView() {
                   />
                   Ganho
                 </label>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-gray-700">Vendedor</label>
+                <Select
+                  value={formData.id_vendedor}
+                  onValueChange={(value) => setFormData({ ...formData, id_vendedor: value })}
+                  disabled={!userCanEdit && !isSdr}
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Selecione o vendedor" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {vendedores.map((v) => (
+                      <SelectItem key={v.id} value={v.id.toString()}>
+                        {v.nome_usuario}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-gray-700">Observações</label>
+                <Textarea
+                  value={formData.observacoes}
+                  onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
+                  className="mt-1 w-full rounded-md border border-gray-300 p-2 text-sm"
+                  rows={3}
+                  disabled={!userCanEdit && !isSdr}
+                />
               </div>
 
               {selectedAgendamento.data_agendamento && selectedAgendamento.hora_agendamento && (
