@@ -1245,7 +1245,6 @@ export function AgendamentosKanban() {
                           setFormData((prev) => ({
                             ...prev,
                             ganho: e.target.checked,
-                            realizou_visita: e.target.checked ? true : prev.realizou_visita,
                           }))
                         }
                         disabled={!canEdit}
