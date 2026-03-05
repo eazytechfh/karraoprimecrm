@@ -42,6 +42,30 @@ import { SendMessageModal } from "./send-message-modal"
 import { VehicleAutocomplete } from "./vehicle-autocomplete"
 import { createClient } from "@/utils/supabase/client"
 
+const CHECKBOX_FLAGS_PREFIX = "__flags__:"
+
+function parseCheckboxFlagsFromObservacoes(observacoes?: string) {
+  const raw = observacoes || ""
+  const match = raw.match(/__flags__:rv=(0|1);g=(0|1)/)
+  const hasFlags = !!match
+  const realizouVisita = match ? match[1] === "1" : false
+  const ganho = match ? match[2] === "1" : false
+  const clean = raw
+    .replace(/\n?__flags__:rv=(0|1);g=(0|1)\n?/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim()
+  return { hasFlags, realizouVisita, ganho, cleanObservacoes: clean }
+}
+
+function buildObservacoesWithCheckboxFlags(observacoes: string | undefined, realizouVisita: boolean, ganho: boolean) {
+  const base = (observacoes || "")
+    .replace(/\n?__flags__:rv=(0|1);g=(0|1)\n?/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim()
+  const flags = `${CHECKBOX_FLAGS_PREFIX}rv=${realizouVisita ? "1" : "0"};g=${ganho ? "1" : "0"}`
+  return base ? `${base}\n${flags}` : flags
+}
+
 export function AgendamentosListView() {
   const [agendamentos, setAgendamentos] = useState<Agendamento[]>([])
   const [filteredAgendamentos, setFilteredAgendamentos] = useState<Agendamento[]>([])
@@ -278,8 +302,9 @@ export function AgendamentosListView() {
   }
 
   const handleOpenAgendamento = (agendamento: Agendamento) => {
-    const isGanho = agendamento.estagio_agendamento === "fechou"
-    const isRealizouVisita = agendamento.estagio_agendamento === "realizou_visita" || isGanho
+    const parsed = parseCheckboxFlagsFromObservacoes(agendamento.observacoes)
+    const isGanho = parsed.hasFlags ? parsed.ganho : agendamento.estagio_agendamento === "fechou"
+    const isRealizouVisita = parsed.hasFlags ? parsed.realizouVisita : agendamento.estagio_agendamento === "realizou_visita"
 
     setSelectedAgendamento(agendamento)
     setFormData({
@@ -287,7 +312,7 @@ export function AgendamentosListView() {
       data_agendamento: agendamento.data_agendamento || "",
       hora_agendamento: agendamento.hora_agendamento || "",
       id_vendedor: agendamento.id_vendedor?.toString() || "",
-      observacoes: agendamento.observacoes || "",
+      observacoes: parsed.cleanObservacoes || "",
       realizou_visita: isRealizouVisita,
       ganho: isGanho,
     })
@@ -309,7 +334,7 @@ export function AgendamentosListView() {
       hora_agendamento: formData.hora_agendamento,
       id_vendedor: formData.id_vendedor ? Number.parseInt(formData.id_vendedor) : undefined,
       vendedor: vendedores.find((v) => v.id.toString() === formData.id_vendedor)?.nome_usuario,
-      observacoes: formData.observacoes,
+      observacoes: buildObservacoesWithCheckboxFlags(formData.observacoes, formData.realizou_visita, formData.ganho),
       estagio_agendamento,
     })
 

@@ -57,6 +57,29 @@ import { VehicleAutocomplete } from "./vehicle-autocomplete"
 import { createClient } from "@/utils/supabase/client"
 
 const COLUNAS_KANBAN_AGENDAMENTOS = ["agendar", "agendado", "realizou_visita", "fechou", "nao_fechou"]
+const CHECKBOX_FLAGS_PREFIX = "__flags__:"
+
+function parseCheckboxFlagsFromObservacoes(observacoes?: string) {
+  const raw = observacoes || ""
+  const match = raw.match(/__flags__:rv=(0|1);g=(0|1)/)
+  const hasFlags = !!match
+  const realizouVisita = match ? match[1] === "1" : false
+  const ganho = match ? match[2] === "1" : false
+  const clean = raw
+    .replace(/\n?__flags__:rv=(0|1);g=(0|1)\n?/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim()
+  return { hasFlags, realizouVisita, ganho, cleanObservacoes: clean }
+}
+
+function buildObservacoesWithCheckboxFlags(observacoes: string | undefined, realizouVisita: boolean, ganho: boolean) {
+  const base = (observacoes || "")
+    .replace(/\n?__flags__:rv=(0|1);g=(0|1)\n?/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim()
+  const flags = `${CHECKBOX_FLAGS_PREFIX}rv=${realizouVisita ? "1" : "0"};g=${ganho ? "1" : "0"}`
+  return base ? `${base}\n${flags}` : flags
+}
 
 function DraggableCard({
   agendamento,
@@ -532,8 +555,9 @@ export function AgendamentosKanban() {
   }
 
   const handleOpenAgendamento = async (agendamento: Agendamento) => {
-    const isGanho = agendamento.estagio_agendamento === "fechou"
-    const isRealizouVisita = agendamento.estagio_agendamento === "realizou_visita" || isGanho
+    const parsed = parseCheckboxFlagsFromObservacoes(agendamento.observacoes)
+    const isGanho = parsed.hasFlags ? parsed.ganho : agendamento.estagio_agendamento === "fechou"
+    const isRealizouVisita = parsed.hasFlags ? parsed.realizouVisita : agendamento.estagio_agendamento === "realizou_visita"
 
     setSelectedAgendamento(agendamento)
     setFormData({
@@ -541,7 +565,7 @@ export function AgendamentosKanban() {
       data_agendamento: agendamento.data_agendamento || "",
       hora_agendamento: agendamento.hora_agendamento || "",
       vendedor: agendamento.vendedor || "",
-      observacoes: agendamento.observacoes || "",
+      observacoes: parsed.cleanObservacoes || "",
       observacoes_vendedor: agendamento.observacoes_vendedor || "",
       email: agendamento.email || "", // Novo campo
       ganho: isGanho,
@@ -569,7 +593,11 @@ export function AgendamentosKanban() {
         data_agendamento: editedAgendamento.data_agendamento ?? selectedAgendamento.data_agendamento,
         hora_agendamento: editedAgendamento.hora_agendamento ?? selectedAgendamento.hora_agendamento,
         vendedor: editedAgendamento.vendedor ?? selectedAgendamento.vendedor,
-        observacoes: editedAgendamento.observacoes ?? selectedAgendamento.observacoes,
+        observacoes: buildObservacoesWithCheckboxFlags(
+          editedAgendamento.observacoes ?? formData.observacoes ?? selectedAgendamento.observacoes,
+          formData.realizou_visita,
+          formData.ganho,
+        ),
       }
 
       Object.keys(updates).forEach((key) => {
@@ -761,7 +789,11 @@ export function AgendamentosKanban() {
 
     const realizouVisita = filteredAgendamentos.filter((a) => a.estagio_agendamento === "realizou_visita")
     const fechadosEspelho = filteredAgendamentos
-      .filter((a) => a.estagio_agendamento === "fechou")
+      .filter((a) => {
+        if (a.estagio_agendamento !== "fechou") return false
+        const flags = parseCheckboxFlagsFromObservacoes(a.observacoes)
+        return flags.ganho && flags.realizouVisita
+      })
       .map((a) => ({ ...a, __mirrorFromFechou: true }))
 
     return [...realizouVisita, ...fechadosEspelho]
