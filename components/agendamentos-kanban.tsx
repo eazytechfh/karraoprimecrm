@@ -755,7 +755,16 @@ export function AgendamentosKanban() {
   }
 
   const getAgendamentosByStage = (stage: string) => {
-    return filteredAgendamentos.filter((a) => a.estagio_agendamento === stage)
+    if (stage !== "realizou_visita") {
+      return filteredAgendamentos.filter((a) => a.estagio_agendamento === stage)
+    }
+
+    const realizouVisita = filteredAgendamentos.filter((a) => a.estagio_agendamento === "realizou_visita")
+    const fechadosEspelho = filteredAgendamentos
+      .filter((a) => a.estagio_agendamento === "fechou")
+      .map((a) => ({ ...a, __mirrorFromFechou: true }))
+
+    return [...realizouVisita, ...fechadosEspelho]
   }
 
   const formatHistoricoDate = (dateString: string) => {
@@ -1055,7 +1064,7 @@ export function AgendamentosKanban() {
       <DndContext onDragEnd={handleDragEnd}>
         <div className="flex gap-4 overflow-x-auto pb-4">
           {COLUNAS_KANBAN_AGENDAMENTOS.map((coluna) => {
-            const agendamentosColuna = filteredAgendamentos.filter((a) => a.estagio_agendamento === coluna)
+            const agendamentosColuna = getAgendamentosByStage(coluna)
             const total = agendamentosColuna.reduce((sum, a) => sum + Number(a.valor_venda || 0), 0)
 
             return (
@@ -1082,17 +1091,40 @@ export function AgendamentosKanban() {
                     {agendamentosColuna.length === 0 ? (
                       <p className="text-sm text-muted-foreground text-center py-4">Nenhum agendamento</p>
                     ) : (
-                      agendamentosColuna.map((agendamento) => (
-                        <DraggableCard
-                          key={agendamento.id}
-                          agendamento={agendamento}
-                          onClick={() => handleOpenAgendamento(agendamento)}
-                          onRealizouVisita={handleRealizouVisita}
-                          onNaoRealizouVisita={handleNaoRealizouVisita}
-                          onVendido={handleVendido}
-                          isMoving={movingAgendamento === agendamento.id}
-                        />
-                      ))
+                      agendamentosColuna.map((agendamento: any) =>
+                        agendamento.__mirrorFromFechou ? (
+                          <Card
+                            key={`mirror-fechou-${agendamento.id}`}
+                            className="transition-all duration-200 cursor-pointer border-green-200 bg-green-50/30"
+                            onClick={() => handleOpenAgendamento(agendamento)}
+                          >
+                            <CardHeader className="p-3 pr-10">
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex-1 min-w-0">
+                                  <CardTitle className="text-sm font-medium truncate">{agendamento.nome_lead}</CardTitle>
+                                  {agendamento.telefone && (
+                                    <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                                      <Phone className="h-3 w-3" />
+                                      {agendamento.telefone}
+                                    </p>
+                                  )}
+                                  <p className="text-xs text-green-700 mt-2">Espelho de "Fechou"</p>
+                                </div>
+                              </div>
+                            </CardHeader>
+                          </Card>
+                        ) : (
+                          <DraggableCard
+                            key={agendamento.id}
+                            agendamento={agendamento}
+                            onClick={() => handleOpenAgendamento(agendamento)}
+                            onRealizouVisita={handleRealizouVisita}
+                            onNaoRealizouVisita={handleNaoRealizouVisita}
+                            onVendido={handleVendido}
+                            isMoving={movingAgendamento === agendamento.id}
+                          />
+                        ),
+                      )
                     )}
                   </CardContent>
                 </Card>
