@@ -55,7 +55,7 @@ import { createClient } from "@/utils/supabase/client"
 import { Input } from "@/components/ui/input" // Added Input component
 import { toast } from "@/components/ui/use-toast" // Added toast for notifications
 
-const COLUNAS_KANBAN = ["novo_lead", "em_qualificacao", "transferido", "vendedor", "follow_up"]
+const COLUNAS_KANBAN = ["novo_lead", "em_qualificacao", "vendedor", "follow_up"]
 const MOTIVOS_LEAD = [
   "Nenhum motivo",
   "Desistência cliente",
