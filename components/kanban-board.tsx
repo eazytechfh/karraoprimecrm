@@ -1286,7 +1286,7 @@ export function KanbanBoard() {
                           />
                         </div>
 
-                        {/* Observação do Vendedor - Editável */}
+                        {/* Interacoes do Lead */}
                         <div>
                           <EditableObservacaoField
                             leadId={selectedLead.id}
