@@ -25,7 +25,7 @@ export const ESTAGIO_LABELS = {
   em_qualificacao: "Em Qualificação",
   transferido: "Transferido",
   vendedor: "Vendedor",
-  follow_up: "Follow Up",
+  follow_up: "Resgate",
 }
 
 export const ESTAGIO_COLORS = {
