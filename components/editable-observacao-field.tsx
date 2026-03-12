@@ -216,7 +216,7 @@ export function EditableObservacaoField({
     <div className={`rounded-lg border border-orange-200 bg-orange-50/40 p-4 ${className}`}>
       <div className="mb-4 flex items-center gap-2">
         <MessageSquare className="h-4 w-4 text-orange-600" />
-        <span className="text-sm font-medium text-orange-800">Interacoes do Lead</span>
+        <span className="text-sm font-medium text-orange-800">Interações do Lead</span>
       </div>
 
       <div className="mb-4 max-h-[280px] space-y-3 overflow-y-auto pr-1">
