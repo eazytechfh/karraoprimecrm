@@ -595,14 +595,16 @@ export function DashboardCharts() {
                     boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1)",
                     backdropFilter: "blur(10px)",
                   }}
-                  formatter={(value, name) => [
-                    value,
-                    name === "total_agendamentos"
-                      ? "📊 Total Agendamentos"
-                      : name === "agendamentos_realizados"
-                        ? "📅 Agendados"
-                        : "✅ Fechados",
-                  ]}
+                  formatter={(value, name, item) => {
+                    const dataKey = String((item as any)?.dataKey || "")
+                    const labelMap: Record<string, string> = {
+                      total_agendamentos: "Total Agendamentos",
+                      agendamentos_realizados: "Agendados",
+                      agendamentos_fechados: "Fechados",
+                    }
+                    const label = labelMap[dataKey] || String(name)
+                    return [value, label]
+                  }}
                 />
                 <Legend iconType="circle" />
                 <Bar
