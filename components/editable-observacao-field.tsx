@@ -5,7 +5,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
 import { updateLeadObservacao } from "@/lib/leads"
 import { CARGO_LABELS, getCurrentUser } from "@/lib/auth"
-import { Loader2, MessageSquare, Plus } from "lucide-react"
+import { Edit3, Loader2, MessageSquare, Plus, X } from "lucide-react"
 
 interface EditableObservacaoFieldProps {
   leadId: number
@@ -15,6 +15,7 @@ interface EditableObservacaoFieldProps {
 }
 
 interface InteractionEntry {
+  id: string
   author: string
   cargo: string
   createdAt: string
@@ -41,70 +42,111 @@ function parseInteractionHistory(observacao: string): InteractionEntry[] {
 
   if (!content) return []
 
-  const blocks = content
-    .split(INTERACTION_END)
-    .map((block) => block.trim())
-    .filter(Boolean)
+  const blockRegex = /\[Interacao\]([\s\S]*?)\[\/Interacao\]/g
+  const parsedEntries: InteractionEntry[] = []
+  const legacyParts: string[] = []
+  let lastIndex = 0
+  let match: RegExpExecArray | null = null
 
-  const parsedEntries = blocks
-    .map((block) => {
-      if (!block.startsWith(INTERACTION_START)) return null
+  while ((match = blockRegex.exec(content)) !== null) {
+    const legacyChunk = content.slice(lastIndex, match.index).trim()
+    if (legacyChunk) {
+      legacyParts.push(legacyChunk)
+    }
 
-      const normalizedBlock = block.replace(INTERACTION_START, "").trim()
-      const lines = normalizedBlock.split("\n")
-      const authorLine = lines.find((line) => line.startsWith("Autor: "))
-      const cargoLine = lines.find((line) => line.startsWith("Cargo: "))
-      const dateLine = lines.find((line) => line.startsWith("Data: "))
-      const messageIndex = lines.findIndex((line) => line.startsWith("Mensagem: "))
+    const normalizedBlock = match[1].trim()
+    const lines = normalizedBlock.split("\n")
+    const authorLine = lines.find((line) => line.startsWith("Autor: "))
+    const cargoLine = lines.find((line) => line.startsWith("Cargo: "))
+    const dateLine = lines.find((line) => line.startsWith("Data: "))
+    const messageIndex = lines.findIndex((line) => line.startsWith("Mensagem: "))
 
-      if (!authorLine || !cargoLine || !dateLine || messageIndex === -1) return null
-
+    if (authorLine && cargoLine && dateLine && messageIndex !== -1) {
       const firstMessageLine = lines[messageIndex].replace("Mensagem: ", "")
       const remainingMessageLines = lines.slice(messageIndex + 1)
+      const createdAt = dateLine.replace("Data: ", "").trim()
 
-      return {
+      parsedEntries.push({
+        id: `${createdAt}-${parsedEntries.length}`,
         author: authorLine.replace("Autor: ", "").trim(),
         cargo: cargoLine.replace("Cargo: ", "").trim(),
-        createdAt: dateLine.replace("Data: ", "").trim(),
+        createdAt,
         message: [firstMessageLine, ...remainingMessageLines].join("\n").trim(),
-      }
-    })
-    .filter((entry): entry is InteractionEntry => Boolean(entry))
+      })
+    }
 
-  if (parsedEntries.length > 0) return parsedEntries.reverse()
+    lastIndex = blockRegex.lastIndex
+  }
 
-  return [
-    {
-      author: "Registro anterior",
-      cargo: "Historico",
-      createdAt: "",
-      message: content,
-      isLegacy: true,
-    },
-  ]
+  const trailingLegacy = content.slice(lastIndex).trim()
+  if (trailingLegacy) {
+    legacyParts.push(trailingLegacy)
+  }
+
+  const legacyEntries = legacyParts.map((message, index) => ({
+    id: `legacy-${index}`,
+    author: "Registro anterior",
+    cargo: "Historico",
+    createdAt: "",
+    message,
+    isLegacy: true,
+  }))
+
+  return [...parsedEntries.reverse(), ...legacyEntries]
 }
 
-function buildInteractionEntry(message: string) {
+function createInteractionEntry(message: string, existingEntry?: InteractionEntry): InteractionEntry {
   const currentUser = getCurrentUser()
-  const author = currentUser?.nome_usuario || "Usuario"
-  const cargo = currentUser?.cargo ? CARGO_LABELS[currentUser.cargo] || currentUser.cargo : "Usuario"
-  const createdAt = new Date().toISOString()
+  const author = existingEntry?.author || currentUser?.nome_usuario || "Usuario"
+  const cargo =
+    existingEntry?.cargo || (currentUser?.cargo ? CARGO_LABELS[currentUser.cargo] || currentUser.cargo : "Usuario")
+  const createdAt = existingEntry?.createdAt || new Date().toISOString()
 
-  return [
-    INTERACTION_START,
-    `Autor: ${author}`,
-    `Cargo: ${cargo}`,
-    `Data: ${createdAt}`,
-    `Mensagem: ${message.trim()}`,
-    INTERACTION_END,
-  ].join("\n")
+  return {
+    id: existingEntry?.id || `${createdAt}-${Math.random().toString(36).slice(2, 8)}`,
+    author,
+    cargo,
+    createdAt,
+    message: message.trim(),
+    isLegacy: existingEntry?.isLegacy,
+  }
 }
 
-function appendInteraction(observacao: string, message: string) {
-  const { motivoLine, content } = splitMotivoAndContent(observacao)
-  const parts = [content, buildInteractionEntry(message)].filter(Boolean)
-  const nextContent = parts.join("\n\n").trim()
-  return [nextContent, motivoLine].filter(Boolean).join("\n").trim()
+function serializeInteractionEntries(entries: InteractionEntry[]) {
+  return entries
+    .slice()
+    .reverse()
+    .map((entry) => {
+      if (entry.isLegacy) {
+        return entry.message.trim()
+      }
+
+      return [
+        INTERACTION_START,
+        `Autor: ${entry.author}`,
+        `Cargo: ${entry.cargo}`,
+        `Data: ${entry.createdAt}`,
+        `Mensagem: ${entry.message.trim()}`,
+        INTERACTION_END,
+      ].join("\n")
+    })
+    .filter(Boolean)
+    .join("\n\n")
+    .trim()
+}
+
+function buildObservacaoWithEntries(observacao: string, entries: InteractionEntry[]) {
+  const { motivoLine } = splitMotivoAndContent(observacao)
+  const serializedEntries = serializeInteractionEntries(entries)
+  return [serializedEntries, motivoLine].filter(Boolean).join("\n").trim()
+}
+
+function upsertInteractionEntry(entries: InteractionEntry[], message: string, editingEntryId: string | null) {
+  if (editingEntryId) {
+    return entries.map((entry) => (entry.id === editingEntryId ? createInteractionEntry(message, entry) : entry))
+  }
+
+  return [createInteractionEntry(message), ...entries]
 }
 
 function formatInteractionDate(dateValue: string) {
@@ -113,7 +155,12 @@ function formatInteractionDate(dateValue: string) {
   const date = new Date(dateValue)
   if (Number.isNaN(date.getTime())) return dateValue
 
-  return date.toLocaleString("pt-BR")
+  const day = String(date.getDate()).padStart(2, "0")
+  const month = String(date.getMonth() + 1).padStart(2, "0")
+  const hours = String(date.getHours()).padStart(2, "0")
+  const minutes = String(date.getMinutes()).padStart(2, "0")
+
+  return `${day}/${month} ${hours}:${minutes}`
 }
 
 export function EditableObservacaoField({
@@ -125,10 +172,23 @@ export function EditableObservacaoField({
   const [newMessage, setNewMessage] = useState("")
   const [loading, setLoading] = useState(false)
   const [entries, setEntries] = useState<InteractionEntry[]>(() => parseInteractionHistory(currentObservacao || ""))
+  const [editingEntryId, setEditingEntryId] = useState<string | null>(null)
 
   useEffect(() => {
     setEntries(parseInteractionHistory(currentObservacao || ""))
+    setEditingEntryId(null)
+    setNewMessage("")
   }, [currentObservacao])
+
+  const handleStartEdit = (entry: InteractionEntry) => {
+    setEditingEntryId(entry.id)
+    setNewMessage(entry.message)
+  }
+
+  const handleCancelEdit = () => {
+    setEditingEntryId(null)
+    setNewMessage("")
+  }
 
   const handleSave = async () => {
     if (!newMessage.trim()) return
@@ -136,12 +196,14 @@ export function EditableObservacaoField({
     setLoading(true)
 
     try {
-      const nextObservacao = appendInteraction(currentObservacao || "", newMessage)
+      const nextEntries = upsertInteractionEntry(entries, newMessage, editingEntryId)
+      const nextObservacao = buildObservacaoWithEntries(currentObservacao || "", nextEntries)
       const success = await updateLeadObservacao(leadId, nextObservacao)
 
       if (success) {
         onObservacaoUpdate(nextObservacao)
         setNewMessage("")
+        setEditingEntryId(null)
       }
     } catch (error) {
       console.error("Error updating observacao:", error)
@@ -159,9 +221,22 @@ export function EditableObservacaoField({
 
       <div className="mb-4 max-h-[280px] space-y-3 overflow-y-auto pr-1">
         {entries.length > 0 ? (
-          entries.map((entry, index) => (
-            <div key={`${entry.createdAt}-${index}`} className="rounded-lg border border-orange-100 bg-white p-3 shadow-sm">
-              <p className="whitespace-pre-wrap text-sm leading-relaxed text-gray-700">{entry.message}</p>
+          entries.map((entry) => (
+            <div key={entry.id} className="rounded-lg border border-orange-100 bg-white p-3 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <p className="whitespace-pre-wrap text-sm leading-relaxed text-gray-700">{entry.message}</p>
+                {!entry.isLegacy && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 shrink-0 text-orange-500 hover:bg-orange-100 hover:text-orange-700"
+                    onClick={() => handleStartEdit(entry)}
+                  >
+                    <Edit3 className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+              </div>
               <div className="mt-3 text-xs text-gray-500">
                 {entry.isLegacy ? (
                   <span>{entry.author}</span>
@@ -188,7 +263,13 @@ export function EditableObservacaoField({
           placeholder="Digite uma nova interacao para este lead..."
           disabled={loading}
         />
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2">
+          {editingEntryId && (
+            <Button type="button" size="sm" variant="outline" onClick={handleCancelEdit} disabled={loading}>
+              <X className="mr-1 h-3 w-3" />
+              Cancelar
+            </Button>
+          )}
           <Button
             size="sm"
             onClick={handleSave}
@@ -196,12 +277,10 @@ export function EditableObservacaoField({
             className="bg-orange-500 text-white hover:bg-orange-600"
           >
             {loading ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Plus className="mr-1 h-3 w-3" />}
-            Registrar interacao
+            {editingEntryId ? "Salvar edicao" : "Registrar interacao"}
           </Button>
         </div>
-        <p className="text-xs text-gray-500">
-          Cada nova mensagem fica registrada com usuario, cargo e data.
-        </p>
+        <p className="text-xs text-gray-500">Cada nova mensagem fica registrada com usuario, cargo e data.</p>
       </div>
     </div>
   )
