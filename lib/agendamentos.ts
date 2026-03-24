@@ -65,6 +65,40 @@ export const ESTAGIO_AGENDAMENTO_COLORS = {
 
 export const VALID_ESTAGIOS_AGENDAMENTO = ["agendar", "agendado", "realizou_visita", "fechou", "nao_fechou"]
 
+export interface AgendamentoCheckboxFlags {
+  hasFlags: boolean
+  realizouVisita: boolean
+  ganho: boolean
+  cleanObservacoes: string
+}
+
+export function parseAgendamentoCheckboxFlags(observacoes?: string): AgendamentoCheckboxFlags {
+  const raw = observacoes || ""
+  const match = raw.match(/__flags__:rv=(0|1);g=(0|1)/)
+  const hasFlags = !!match
+  const realizouVisita = match ? match[1] === "1" : false
+  const ganho = match ? match[2] === "1" : false
+  const cleanObservacoes = raw
+    .replace(/\n?__flags__:rv=(0|1);g=(0|1)\n?/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim()
+
+  return { hasFlags, realizouVisita, ganho, cleanObservacoes }
+}
+
+export function shouldAppearInRealizouVisitaColumn(agendamento: Pick<Agendamento, "estagio_agendamento" | "observacoes">) {
+  if (agendamento.estagio_agendamento === "realizou_visita") {
+    return true
+  }
+
+  if (agendamento.estagio_agendamento !== "fechou") {
+    return false
+  }
+
+  const flags = parseAgendamentoCheckboxFlags(agendamento.observacoes)
+  return flags.ganho && flags.realizouVisita
+}
+
 export const MOTIVOS_PERDA = [
   "Avaliação baixa",
   "Desistência do cliente",

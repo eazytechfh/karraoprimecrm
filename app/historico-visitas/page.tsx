@@ -12,6 +12,7 @@ import {
   getHistoricoVisitas,
   getVendedores,
   getSdrs,
+  shouldAppearInRealizouVisitaColumn,
   type Agendamento,
   type Vendedor,
   ESTAGIO_AGENDAMENTO_LABELS,
@@ -55,9 +56,6 @@ export default function HistoricoVisitasPage() {
     if (filters.sdr) {
       filterParams.sdr = filters.sdr
     }
-    if (filters.status) {
-      filterParams.status = filters.status
-    }
     if (filters.dataInicio) {
       filterParams.dataInicio = filters.dataInicio
     }
@@ -89,9 +87,19 @@ export default function HistoricoVisitasPage() {
       )
     }
 
+    if (filters.status) {
+      filtered = filtered.filter((h) => {
+        if (filters.status === "realizou_visita") {
+          return shouldAppearInRealizouVisitaColumn(h)
+        }
+
+        return h.estagio_agendamento === filters.status
+      })
+    }
+
     if (filters.realizouVisita) {
       filtered = filtered.filter((h) => {
-        const realizouVisita = h.estagio_agendamento === "realizou_visita" || h.estagio_agendamento === "fechou"
+        const realizouVisita = shouldAppearInRealizouVisitaColumn(h)
         return filters.realizouVisita === "sim" ? realizouVisita : !realizouVisita
       })
     }
@@ -358,8 +366,7 @@ export default function HistoricoVisitasPage() {
                   {filteredHistorico.map((visita) => (
                     <TableRow key={visita.id}>
                       {(() => {
-                        const realizouVisita =
-                          visita.estagio_agendamento === "realizou_visita" || visita.estagio_agendamento === "fechou"
+                        const realizouVisita = shouldAppearInRealizouVisitaColumn(visita)
                         const ganhou = visita.estagio_agendamento === "fechou"
                         return (
                           <>
