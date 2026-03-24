@@ -23,7 +23,6 @@ import { Calendar, Phone, User, Clock, Filter } from "lucide-react"
 
 export default function HistoricoVisitasPage() {
   const router = useRouter()
-  const [currentUser, setCurrentUser] = useState<ReturnType<typeof getCurrentUser>>(null)
   const [historico, setHistorico] = useState<Agendamento[]>([])
   const [filteredHistorico, setFilteredHistorico] = useState<Agendamento[]>([])
   const [vendedores, setVendedores] = useState<Vendedor[]>([])
@@ -41,6 +40,8 @@ export default function HistoricoVisitasPage() {
     dataInicio: "",
     dataFim: "",
   })
+
+  const currentUser = getCurrentUser()
 
   const loadData = async () => {
     if (!currentUser) return
@@ -167,10 +168,6 @@ export default function HistoricoVisitasPage() {
       </Badge>
     )
   }
-
-  useEffect(() => {
-    setCurrentUser(getCurrentUser())
-  }, [])
 
   useEffect(() => {
     if (!currentUser) {
