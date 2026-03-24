@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -9,7 +8,6 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { getCurrentUser } from "@/lib/auth"
-import { SidebarNav } from "@/components/sidebar-nav"
 import {
   getHistoricoVisitas,
   getVendedores,
@@ -22,19 +20,18 @@ import {
 import { Calendar, Phone, User, Clock, Filter } from "lucide-react"
 
 export default function HistoricoVisitasPage() {
-  const router = useRouter()
   const [historico, setHistorico] = useState<Agendamento[]>([])
   const [filteredHistorico, setFilteredHistorico] = useState<Agendamento[]>([])
   const [vendedores, setVendedores] = useState<Vendedor[]>([])
-  const [sdrs, setSdrs] = useState<Vendedor[]>([])
+  const [sdrs, setSdrs] = useState<Vendedor[]>([]) // Added SDRs state
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
 
   const [filters, setFilters] = useState({
     periodo: "",
     vendedor: "",
-    sdr: "",
-    status: "",
+    sdr: "", // Added SDR filter
+    status: "", // Added status filter
     realizouVisita: "",
     ganho: "",
     dataInicio: "",
@@ -48,13 +45,7 @@ export default function HistoricoVisitasPage() {
 
     setLoading(true)
 
-    const filterParams: {
-      periodo?: string
-      vendedor?: string
-      sdr?: string
-      dataInicio?: string
-      dataFim?: string
-    } = {}
+    const filterParams: any = {}
 
     if (filters.periodo) {
       filterParams.periodo = filters.periodo
@@ -124,7 +115,7 @@ export default function HistoricoVisitasPage() {
   }
 
   const handleFilterChange = (key: string, value: string) => {
-    setFilters((prev) => ({ ...prev, [key]: value }))
+    setFilters({ ...filters, [key]: value })
   }
 
   const handleApplyFilters = () => {
@@ -135,8 +126,8 @@ export default function HistoricoVisitasPage() {
     setFilters({
       periodo: "",
       vendedor: "",
-      sdr: "",
-      status: "",
+      sdr: "", // Added SDR to clear
+      status: "", // Added status to clear
       realizouVisita: "",
       ganho: "",
       dataInicio: "",
@@ -170,33 +161,34 @@ export default function HistoricoVisitasPage() {
   }
 
   useEffect(() => {
-    if (!currentUser) {
-      router.push("/")
-      return
-    }
-
     loadData()
-  }, [router, currentUser])
+  }, [])
 
   useEffect(() => {
     filterHistorico()
-  }, [historico, searchTerm, filters.status, filters.realizouVisita, filters.ganho])
+  }, [historico, searchTerm, filters.realizouVisita, filters.ganho])
 
-  const pageContent = loading ? (
-    <Card className="animate-pulse">
-      <CardHeader>
-        <div className="h-6 bg-gray-200 rounded w-48"></div>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-3">
-          {[...Array(5)].map((_, i) => (
-            <div key={i} className="h-16 bg-gray-100 rounded"></div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
-  ) : (
-    <div className="space-y-6">
+  if (loading) {
+    return (
+      <div className="container mx-auto p-6">
+        <Card className="animate-pulse">
+          <CardHeader>
+            <div className="h-6 bg-gray-200 rounded w-48"></div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="h-16 bg-gray-100 rounded"></div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  return (
+    <div className="container mx-auto p-6 space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Histórico de Visitas</h1>
         <p className="text-gray-600 mt-1">Visualize todas as visitas realizadas, reagendadas e não fechadas</p>
@@ -210,7 +202,7 @@ export default function HistoricoVisitasPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700">Período Rápido</label>
               <Select value={filters.periodo} onValueChange={(value) => handleFilterChange("periodo", value)}>
@@ -226,12 +218,20 @@ export default function HistoricoVisitasPage() {
 
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700">Data Início</label>
-              <Input type="date" value={filters.dataInicio} onChange={(e) => handleFilterChange("dataInicio", e.target.value)} />
+              <Input
+                type="date"
+                value={filters.dataInicio}
+                onChange={(e) => handleFilterChange("dataInicio", e.target.value)}
+              />
             </div>
 
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700">Data Fim</label>
-              <Input type="date" value={filters.dataFim} onChange={(e) => handleFilterChange("dataFim", e.target.value)} />
+              <Input
+                type="date"
+                value={filters.dataFim}
+                onChange={(e) => handleFilterChange("dataFim", e.target.value)}
+              />
             </div>
 
             {currentUser?.cargo !== "vendedor" && (
@@ -363,102 +363,93 @@ export default function HistoricoVisitasPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredHistorico.map((visita) => {
-                    const realizouVisita = shouldAppearInRealizouVisitaColumn(visita)
-                    const ganhou = visita.estagio_agendamento === "fechou"
-
-                    return (
-                      <TableRow key={visita.id}>
-                        <TableCell className="font-medium">{visita.nome_lead}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1 text-sm text-gray-600">
-                            <Phone className="h-3 w-3" />
-                            {visita.telefone}
-                          </div>
-                        </TableCell>
-                        <TableCell>{visita.vendedor || "-"}</TableCell>
-                        <TableCell>{visita.sdr_responsavel || "-"}</TableCell>
-                        <TableCell>
-                          {visita.data_venda ? (
-                            <div className="flex items-center gap-1 text-sm">
-                              <Calendar className="h-3 w-3 text-gray-400" />
-                              {new Date(`${visita.data_venda}T00:00:00`).toLocaleDateString("pt-BR")}
-                              {visita.updated_at && visita.estagio_agendamento === "fechou" && (
-                                <>
-                                  {" · "}
-                                  <Clock className="h-3 w-3 text-gray-400" />
-                                  {new Date(visita.updated_at).toLocaleTimeString("pt-BR", {
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                  })}
-                                </>
-                              )}
-                            </div>
-                          ) : (
-                            "-"
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {visita.data_agendamento ? (
-                            <div className="flex items-center gap-1 text-sm">
-                              <Calendar className="h-3 w-3 text-gray-400" />
-                              {new Date(`${visita.data_agendamento}T00:00:00`).toLocaleDateString("pt-BR")}
-                              {visita.hora_agendamento && (
-                                <>
-                                  {" · "}
-                                  <Clock className="h-3 w-3 text-gray-400" />
-                                  {visita.hora_agendamento}
-                                </>
-                              )}
-                            </div>
-                          ) : (
-                            "-"
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <Badge className={realizouVisita ? "bg-purple-100 text-purple-800" : "bg-gray-100 text-gray-700"}>
-                            {realizouVisita ? "Sim" : "Não"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge className={ganhou ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-700"}>
-                            {ganhou ? "Sim" : "Não"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{getStatusBadge(visita.estagio_agendamento)}</TableCell>
-                        <TableCell className="text-sm text-gray-600">{formatDate(visita.updated_at)}</TableCell>
-                        {filteredHistorico.some((h) => h.motivo_perda) && (
-                          <TableCell>
-                            {visita.motivo_perda ? (
-                              <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
-                                {visita.motivo_perda}
-                              </Badge>
-                            ) : (
-                              "-"
+                  {filteredHistorico.map((visita) => (
+                    <TableRow key={visita.id}>
+                      {(() => {
+                        const realizouVisita = shouldAppearInRealizouVisitaColumn(visita)
+                        const ganhou = visita.estagio_agendamento === "fechou"
+                        return (
+                          <>
+                      <TableCell className="font-medium">{visita.nome_lead}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1 text-sm text-gray-600">
+                          <Phone className="h-3 w-3" />
+                          {visita.telefone}
+                        </div>
+                      </TableCell>
+                      <TableCell>{visita.vendedor || "-"}</TableCell>
+                      <TableCell>{visita.sdr_responsavel || "-"}</TableCell>
+                      <TableCell>
+                        {visita.data_venda ? (
+                          <div className="flex items-center gap-1 text-sm">
+                            <Calendar className="h-3 w-3 text-gray-400" />
+                            {new Date(visita.data_venda + "T00:00:00").toLocaleDateString("pt-BR")}
+                            {visita.updated_at && visita.estagio_agendamento === "fechou" && (
+                              <>
+                                {" • "}
+                                <Clock className="h-3 w-3 text-gray-400" />
+                                {new Date(visita.updated_at).toLocaleTimeString("pt-BR", {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })}
+                              </>
                             )}
-                          </TableCell>
+                          </div>
+                        ) : (
+                          "-"
                         )}
-                      </TableRow>
-                    )
-                  })}
+                      </TableCell>
+                      <TableCell>
+                        {visita.data_agendamento ? (
+                          <div className="flex items-center gap-1 text-sm">
+                            <Calendar className="h-3 w-3 text-gray-400" />
+                            {new Date(visita.data_agendamento + "T00:00:00").toLocaleDateString("pt-BR")}
+                            {visita.hora_agendamento && (
+                              <>
+                                {" • "}
+                                <Clock className="h-3 w-3 text-gray-400" />
+                                {visita.hora_agendamento}
+                              </>
+                            )}
+                          </div>
+                        ) : (
+                          "-"
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={realizouVisita ? "bg-purple-100 text-purple-800" : "bg-gray-100 text-gray-700"}>
+                          {realizouVisita ? "Sim" : "Não"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={ganhou ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-700"}>
+                          {ganhou ? "Sim" : "Não"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{getStatusBadge(visita.estagio_agendamento)}</TableCell>
+                      <TableCell className="text-sm text-gray-600">{formatDate(visita.updated_at)}</TableCell>
+                      {filteredHistorico.some((h) => h.motivo_perda) && (
+                        <TableCell>
+                          {visita.motivo_perda ? (
+                            <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                              {visita.motivo_perda}
+                            </Badge>
+                          ) : (
+                            "-"
+                          )}
+                        </TableCell>
+                      )}
+                          </>
+                        )
+                      })()}
+                    </TableRow>
+                  ))}
                 </TableBody>
               </Table>
             </div>
           )}
         </CardContent>
       </Card>
-    </div>
-  )
-
-  return (
-    <div className="flex h-screen bg-gray-50">
-      <SidebarNav />
-
-      <div className="flex-1 flex flex-col overflow-hidden lg:ml-0">
-        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50">
-          <div className="container mx-auto px-6 py-8">{pageContent}</div>
-        </main>
-      </div>
     </div>
   )
 }
