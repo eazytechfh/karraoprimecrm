@@ -178,16 +178,30 @@ export async function getLeads(idEmpresa: number): Promise<Lead[]> {
   const supabase = createClient()
   const user = getCurrentUser()
 
+  if (user && user.cargo === "sdr") {
+    const { data, error } = await supabase
+      .from("BASE_DE_LEADS")
+      .select("*")
+      .eq("id_empresa", idEmpresa)
+      .or(`sdr_responsavel.eq.${user.nome_usuario},estagio_lead.eq.resgate`)
+      .order("created_at", { ascending: false })
+
+    if (error) {
+      console.error("Error fetching leads:", error)
+      return []
+    }
+
+    return (data || []).map((lead) => ({
+      ...lead,
+      estagio_lead: normalizeLeadStage(lead.estagio_lead),
+    }))
+  }
+
   let query = supabase
     .from("BASE_DE_LEADS")
     .select("*")
     .eq("id_empresa", idEmpresa)
     .order("created_at", { ascending: false })
-
-  // Se for SDR, filtra apenas os leads direcionados para ele
-  if (user && user.cargo === "sdr") {
-    query = query.eq("sdr_responsavel", user.nome_usuario)
-  }
 
   // Se for vendedor, filtra apenas os leads atribuídos a ele
   if (user && user.cargo === "vendedor") {
