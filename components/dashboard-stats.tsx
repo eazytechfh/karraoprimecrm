@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { getLeadStats, ESTAGIO_LABELS } from "@/lib/leads"
+import { getAccurateLeadStats, ESTAGIO_LABELS } from "@/lib/leads"
 import { getCurrentUser } from "@/lib/auth"
 import { Users, TrendingUp, Award, Zap, Activity, DollarSign } from "lucide-react"
 
@@ -32,7 +32,7 @@ export function DashboardStats() {
     const loadStats = async () => {
       const user = getCurrentUser()
       if (user) {
-        const data = await getLeadStats(user.id_empresa)
+        const data = await getAccurateLeadStats(user.id_empresa)
         setStats(data)
       }
       setLoading(false)

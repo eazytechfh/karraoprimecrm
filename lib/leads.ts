@@ -52,6 +52,85 @@ export interface CreateLeadData {
   sdr_responsavel?: string
 }
 
+const DASHBOARD_BATCH_SIZE = 1000
+
+async function fetchAllLeadStatsRows(idEmpresa: number) {
+  const supabase = createClient()
+  const allLeads: Array<Pick<Lead, "estagio_lead" | "origem" | "valor">> = []
+  let from = 0
+
+  while (true) {
+    const to = from + DASHBOARD_BATCH_SIZE - 1
+    const { data, error } = await supabase
+      .from("BASE_DE_LEADS")
+      .select("estagio_lead, origem, valor")
+      .eq("id_empresa", idEmpresa)
+      .range(from, to)
+
+    if (error) {
+      throw error
+    }
+
+    if (!data || data.length === 0) {
+      break
+    }
+
+    allLeads.push(...data)
+
+    if (data.length < DASHBOARD_BATCH_SIZE) {
+      break
+    }
+
+    from += DASHBOARD_BATCH_SIZE
+  }
+
+  return allLeads
+}
+
+export async function getAccurateLeadStats(idEmpresa: number) {
+  try {
+    const leads = await fetchAllLeadStatsRows(idEmpresa)
+
+    const totalLeads = leads.length
+    const leadsPorEstagio = leads.reduce((acc: any, lead) => {
+      acc[lead.estagio_lead] = (acc[lead.estagio_lead] || 0) + 1
+      return acc
+    }, {})
+
+    const leadsPorOrigem = leads.reduce((acc: any, lead) => {
+      if (lead.origem) {
+        acc[lead.origem] = (acc[lead.origem] || 0) + 1
+      }
+      return acc
+    }, {})
+
+    const fechados = leadsPorEstagio.fechado || 0
+    const conversao = totalLeads > 0 ? ((fechados / totalLeads) * 100).toFixed(1) : "0"
+
+    const valorTotal = leads.reduce((sum, lead) => sum + (lead.valor || 0), 0)
+    const valorMedio = totalLeads > 0 ? valorTotal / totalLeads : 0
+
+    return {
+      totalLeads,
+      leadsPorEstagio,
+      leadsPorOrigem,
+      conversao,
+      valorTotal,
+      valorMedio,
+    }
+  } catch (error) {
+    console.error("Error fetching accurate lead stats:", error)
+    return {
+      totalLeads: 0,
+      leadsPorEstagio: {},
+      leadsPorOrigem: {},
+      conversao: {},
+      valorTotal: 0,
+      valorMedio: 0,
+    }
+  }
+}
+
 export async function createLead(leadData: CreateLeadData): Promise<boolean> {
   const supabase = createClient()
 

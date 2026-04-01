@@ -48,6 +48,8 @@ export interface EstagioEvolution {
   [key: string]: string | number
 }
 
+const DASHBOARD_BATCH_SIZE = 1000
+
 function getStartDateFromPeriodo(periodo?: string) {
   if (!periodo) return null
 
@@ -74,29 +76,83 @@ function getStartDateFromPeriodo(periodo?: string) {
   return startDate.toISOString()
 }
 
+async function fetchAllDashboardLeads(
+  idEmpresa: number,
+  filters: DashboardFilters = {},
+  startDateISO: string | null,
+) {
+  const supabase = createClient()
+  const allLeads: any[] = []
+  let from = 0
+
+  while (true) {
+    const to = from + DASHBOARD_BATCH_SIZE - 1
+    let query = supabase.from("BASE_DE_LEADS").select("*").eq("id_empresa", idEmpresa)
+
+    if (filters.vendedor) {
+      query = query.eq("vendedor", filters.vendedor)
+    }
+
+    if (filters.origem) {
+      query = query.eq("origem", filters.origem)
+    }
+
+    if (startDateISO) {
+      query = query.gte("created_at", startDateISO)
+    }
+
+    const { data, error } = await query.range(from, to)
+
+    if (error) {
+      throw error
+    }
+
+    if (!data || data.length === 0) {
+      break
+    }
+
+    allLeads.push(...data)
+
+    if (data.length < DASHBOARD_BATCH_SIZE) {
+      break
+    }
+
+    from += DASHBOARD_BATCH_SIZE
+  }
+
+  return allLeads
+}
+
 export async function getDashboardData(idEmpresa: number, filters: DashboardFilters = {}) {
   const supabase = createClient()
 
   // =========================
   // 1) QUERY PRINCIPAL (DADOS)
   // =========================
-  let query = supabase.from("BASE_DE_LEADS").select("*").eq("id_empresa", idEmpresa)
-
-  // Aplicar filtros
-  if (filters.vendedor) {
-    query = query.eq("vendedor", filters.vendedor)
-  }
-
-  if (filters.origem) {
-    query = query.eq("origem", filters.origem)
-  }
-
   const startDateISO = getStartDateFromPeriodo(filters.periodo)
-  if (startDateISO) {
-    query = query.gte("created_at", startDateISO)
-  }
+  let leads: any[] = []
 
-  const { data: leads, error } = await query
+  try {
+    leads = await fetchAllDashboardLeads(idEmpresa, filters, startDateISO)
+  } catch (error) {
+    console.error("Error fetching dashboard data:", error)
+    return {
+      totalLeads: 0,
+      leadsPorEstagio: {},
+      leadsPorOrigem: {},
+      conversao: "0",
+      vendedorStats: [],
+      veiculoStats: [],
+      origemStats: [],
+      sdrPerformanceStats: [],
+      estagioResumo: [],
+      estagioEvolution: [],
+      availableVendedores: [],
+      availableOrigens: [],
+      valorTotal: 0,
+      valorMedio: 0,
+    }
+  }
 
   // ================================
   // 2) COUNT EXATO (TOTAL REAL)
@@ -125,26 +181,6 @@ export async function getDashboardData(idEmpresa: number, filters: DashboardFilt
     .from("AGENDAMENTOS")
     .select("*")
     .eq("id_empresa", idEmpresa)
-
-  if (error || !leads) {
-    console.error("Error fetching dashboard data:", error)
-    return {
-      totalLeads: 0,
-      leadsPorEstagio: {},
-      leadsPorOrigem: {},
-      conversao: "0",
-      vendedorStats: [],
-      veiculoStats: [],
-      origemStats: [],
-      sdrPerformanceStats: [],
-      estagioResumo: [],
-      estagioEvolution: [],
-      availableVendedores: [],
-      availableOrigens: [],
-      valorTotal: 0,
-      valorMedio: 0,
-    }
-  }
 
   if (countError) {
     console.warn("Count error (using leads.length as fallback):", countError)
