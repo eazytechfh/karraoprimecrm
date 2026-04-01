@@ -1,3 +1,4 @@
+import { normalizeLeadStage } from "@/lib/leads"
 import { createClient } from "@/utils/supabase/client"
 
 export interface DashboardFilters {
@@ -198,7 +199,7 @@ export async function getDashboardData(idEmpresa: number, filters: DashboardFilt
 
   // Agrupamento por ESTAGIO_LEAD (coluna estagio_lead)
   const leadsPorEstagio = leads.reduce((acc: any, lead) => {
-    const estagio = lead.estagio_lead
+    const estagio = normalizeLeadStage(lead.estagio_lead)
     acc[estagio] = (acc[estagio] || 0) + 1
     return acc
   }, {})
@@ -241,7 +242,7 @@ export async function getDashboardData(idEmpresa: number, filters: DashboardFilt
     }
 
     // Contar leads por estágio para cada vendedor
-    const estagio = lead.estagio_lead
+    const estagio = normalizeLeadStage(lead.estagio_lead)
     acc[lead.vendedor].leads_por_estagio[estagio] = (acc[lead.vendedor].leads_por_estagio[estagio] || 0) + 1
 
     return acc
@@ -386,10 +387,10 @@ export async function getDashboardData(idEmpresa: number, filters: DashboardFilt
       data: date.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }),
     }
 
-    const estagios = ["novo_lead", "em_qualificacao", "transferido", "follow_up"]
+    const estagios = ["pendente", "contato_iniciado", "nao_responde", "em_qualificacao", "vendedor", "resgate"]
 
     estagios.forEach((estagio) => {
-      dayData[estagio] = dayLeads.filter((lead) => lead.estagio_lead === estagio).length
+      dayData[estagio] = dayLeads.filter((lead) => normalizeLeadStage(lead.estagio_lead) === estagio).length
     })
 
     estagioEvolution.push(dayData)

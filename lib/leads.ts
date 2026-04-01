@@ -21,23 +21,39 @@ export interface Lead {
 }
 
 export const ESTAGIO_LABELS = {
-  novo_lead: "Novo Lead",
-  em_qualificacao: "Em Qualificação",
-  transferido: "Transferido",
+  pendente: "Pendente",
+  em_qualificacao: "Em Qualificacao",
+  contato_iniciado: "Contato Iniciado",
+  nao_responde: "Nao Responde",
   vendedor: "Vendedor",
-  follow_up: "Resgate",
+  resgate: "Resgate",
 }
 
 export const ESTAGIO_COLORS = {
-  novo_lead: "bg-blue-100 text-blue-800",
+  pendente: "bg-slate-100 text-slate-800",
+  contato_iniciado: "bg-blue-100 text-blue-800",
+  nao_responde: "bg-rose-100 text-rose-800",
   em_qualificacao: "bg-yellow-100 text-yellow-800",
-  transferido: "bg-emerald-100 text-emerald-800",
   vendedor: "bg-purple-100 text-purple-800",
-  follow_up: "bg-indigo-100 text-indigo-800",
+  resgate: "bg-indigo-100 text-indigo-800",
 }
 
 // Lista dos estágios válidos para validação
-export const VALID_ESTAGIOS = ["novo_lead", "em_qualificacao", "transferido", "vendedor", "follow_up"]
+export const VALID_ESTAGIOS = ["pendente", "contato_iniciado", "nao_responde", "em_qualificacao", "vendedor", "resgate"]
+
+export function normalizeLeadStage(stage?: string) {
+  switch ((stage || "").toLowerCase()) {
+    case "novo_lead":
+    case "novo lead":
+      return "pendente"
+    case "transferido":
+      return "vendedor"
+    case "follow_up":
+      return "resgate"
+    default:
+      return stage || "pendente"
+  }
+}
 
 export interface CreateLeadData {
   nome_lead: string
@@ -93,7 +109,8 @@ export async function getAccurateLeadStats(idEmpresa: number) {
 
     const totalLeads = leads.length
     const leadsPorEstagio = leads.reduce((acc: any, lead) => {
-      acc[lead.estagio_lead] = (acc[lead.estagio_lead] || 0) + 1
+      const estagio = normalizeLeadStage(lead.estagio_lead)
+      acc[estagio] = (acc[estagio] || 0) + 1
       return acc
     }, {})
 
@@ -184,7 +201,10 @@ export async function getLeads(idEmpresa: number): Promise<Lead[]> {
     return []
   }
 
-  return data || []
+  return (data || []).map((lead) => ({
+    ...lead,
+    estagio_lead: normalizeLeadStage(lead.estagio_lead),
+  }))
 }
 
 export async function updateLeadStage(leadId: number, newStage: string): Promise<boolean> {
@@ -629,7 +649,8 @@ export async function getLeadStats(idEmpresa: number) {
 
   const totalLeads = leads.length
   const leadsPorEstagio = leads.reduce((acc: any, lead) => {
-    acc[lead.estagio_lead] = (acc[lead.estagio_lead] || 0) + 1
+    const estagio = normalizeLeadStage(lead.estagio_lead)
+    acc[estagio] = (acc[estagio] || 0) + 1
     return acc
   }, {})
 

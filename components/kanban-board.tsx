@@ -43,7 +43,6 @@ import {
   updateLeadStage,
   updateLeadObservacao,
   generateResumoComercial,
-  sendPesquisaAtendimentoWebhook,
   deleteLead,
   ESTAGIO_LABELS,
   ESTAGIO_COLORS,
@@ -55,7 +54,7 @@ import { createClient } from "@/utils/supabase/client"
 import { Input } from "@/components/ui/input" // Added Input component
 import { toast } from "@/components/ui/use-toast" // Added toast for notifications
 
-const COLUNAS_KANBAN = ["novo_lead", "em_qualificacao", "vendedor", "follow_up"]
+const COLUNAS_KANBAN = ["pendente", "contato_iniciado", "nao_responde", "em_qualificacao", "vendedor", "resgate"]
 const MOTIVOS_LEAD = [
   "Nenhum motivo",
   "Desistência cliente",
@@ -293,42 +292,13 @@ export function KanbanBoard() {
       } else {
         console.log("Lead moved successfully")
 
-        if ((newStage === "transferido" || newStage === "vendedor") && leadData) {
+        if (newStage === "vendedor" && leadData) {
           await ensureAgendamentoForLead(leadData)
           setResumoMessage({
             type: "success",
-            text: "Lead transferido com sucesso! Um novo agendamento foi criado na aba Agendamentos.",
+            text: "Lead movido para Vendedor com sucesso! Um novo agendamento foi criado na aba Agendamentos.",
           })
           setTimeout(() => setResumoMessage(null), 5000)
-        }
-
-        if (newStage === "pesquisa_atendimento" && leadData) {
-          console.log("[v0] Lead moved to Pesquisa de Atendimento, triggering webhook")
-
-          try {
-            const webhookSuccess = await sendPesquisaAtendimentoWebhook(leadData)
-
-            if (webhookSuccess) {
-              setResumoMessage({
-                type: "success",
-                text: "Lead movido para Pesquisa de Atendimento e webhook enviado com sucesso!",
-              })
-            } else {
-              setResumoMessage({
-                type: "error",
-                text: "Lead movido, mas houve erro ao enviar webhook de Pesquisa de Atendimento.",
-              })
-            }
-
-            setTimeout(() => setResumoMessage(null), 5000)
-          } catch (webhookError) {
-            console.error("[v0] Error sending pesquisa atendimento webhook:", webhookError)
-            setResumoMessage({
-              type: "error",
-              text: "Lead movido, mas houve erro ao processar webhook de Pesquisa de Atendimento.",
-            })
-            setTimeout(() => setResumoMessage(null), 5000)
-          }
         }
       }
     } catch (error) {

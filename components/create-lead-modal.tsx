@@ -72,7 +72,7 @@ export function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLeadModalP
         valor: formData.valor ? Number.parseFloat(formData.valor) : 0,
         observacao_vendedor: formData.observacao_vendedor || undefined,
         id_empresa: user.id_empresa,
-        estagio_lead: "novo_lead",
+        estagio_lead: "pendente",
         sdr_responsavel: user.cargo === "sdr" ? user.nome_usuario : undefined,
       })
 

@@ -38,10 +38,12 @@ const COLORS = [
 ]
 
 const ESTAGIO_COLORS = {
-  novo_lead: "#3b82f6",
+  pendente: "#64748b",
+  contato_iniciado: "#3b82f6",
+  nao_responde: "#f43f5e",
   em_qualificacao: "#f59e0b",
-  transferido: "#10b981",
-  follow_up: "#8b5cf6",
+  vendedor: "#10b981",
+  resgate: "#8b5cf6",
 }
 
 const GRADIENT_COLORS = {
@@ -50,6 +52,25 @@ const GRADIENT_COLORS = {
   success: "from-green-400 to-blue-500",
   warning: "from-yellow-400 to-orange-500",
   danger: "from-red-400 to-pink-500",
+}
+
+function getEstagioLabel(estagio: string) {
+  switch (estagio) {
+    case "pendente":
+      return "Pendente"
+    case "contato_iniciado":
+      return "Contato Iniciado"
+    case "nao_responde":
+      return "N?o Responde"
+    case "em_qualificacao":
+      return "Em Qualifica??o"
+    case "vendedor":
+      return "Vendedor"
+    case "resgate":
+      return "Resgate"
+    default:
+      return estagio
+  }
 }
 
 export function DashboardCharts() {
@@ -284,15 +305,7 @@ export function DashboardCharts() {
                     backdropFilter: "blur(10px)",
                   }}
                   formatter={(value, name) => [value, "Quantidade de Leads"]}
-                  labelFormatter={(label) => {
-                    const labels = {
-                      novo_lead: "🎯 Novo Lead",
-                      em_qualificacao: "⏳ Em Qualificação",
-                      transferido: "✅ Transferido",
-                      follow_up: "📞 Follow Up",
-                    }
-                    return labels[label] || label
-                  }}
+                  labelFormatter={(label) => getEstagioLabel(label)}
                 />
                 <Bar
                   dataKey="quantidade"
@@ -327,15 +340,7 @@ export function DashboardCharts() {
                         }`}
                       ></div>
                       <span className="text-sm font-medium text-gray-700">
-                        {item.estagio === "novo_lead"
-                          ? "Novo Lead"
-                          : item.estagio === "em_qualificacao"
-                            ? "Em Qualificação"
-                            : item.estagio === "transferido"
-                              ? "Transferido"
-                              : item.estagio === "follow_up"
-                                ? "Follow Up"
-                                : item.estagio}
+                        {getEstagioLabel(item.estagio)}
                       </span>
                     </div>
                     <div className="text-right">
@@ -671,11 +676,29 @@ export function DashboardCharts() {
                 <Legend iconType="circle" />
                 <Area
                   type="monotone"
-                  dataKey="novo_lead"
+                  dataKey="pendente"
                   stackId="1"
-                  stroke={ESTAGIO_COLORS.novo_lead}
-                  fill={`url(#areanovo_lead)`}
-                  name="🎯 Novo Lead"
+                  stroke={ESTAGIO_COLORS.pendente}
+                  fill={`url(#areapendente)`}
+                  name="Pendente"
+                  strokeWidth={2}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="contato_iniciado"
+                  stackId="1"
+                  stroke={ESTAGIO_COLORS.contato_iniciado}
+                  fill={`url(#areacontato_iniciado)`}
+                  name="Contato Iniciado"
+                  strokeWidth={2}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="nao_responde"
+                  stackId="1"
+                  stroke={ESTAGIO_COLORS.nao_responde}
+                  fill={`url(#areanao_responde)`}
+                  name="N?o Responde"
                   strokeWidth={2}
                 />
                 <Area
@@ -684,25 +707,25 @@ export function DashboardCharts() {
                   stackId="1"
                   stroke={ESTAGIO_COLORS.em_qualificacao}
                   fill={`url(#areaem_qualificacao)`}
-                  name="⏳ Em Qualificação"
+                  name="Em Qualifica??o"
                   strokeWidth={2}
                 />
                 <Area
                   type="monotone"
-                  dataKey="transferido"
+                  dataKey="vendedor"
                   stackId="1"
-                  stroke={ESTAGIO_COLORS.transferido}
-                  fill={`url(#areatransferido)`}
-                  name="✅ Transferido"
+                  stroke={ESTAGIO_COLORS.vendedor}
+                  fill={`url(#areavendedor)`}
+                  name="Vendedor"
                   strokeWidth={2}
                 />
                 <Area
                   type="monotone"
-                  dataKey="follow_up"
+                  dataKey="resgate"
                   stackId="1"
-                  stroke={ESTAGIO_COLORS.follow_up}
-                  fill={`url(#areafollow_up)`}
-                  name="📞 Follow Up"
+                  stroke={ESTAGIO_COLORS.resgate}
+                  fill={`url(#arearesgate)`}
+                  name="Resgate"
                   strokeWidth={2}
                 />
               </AreaChart>
