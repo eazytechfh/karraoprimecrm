@@ -905,7 +905,7 @@ export function KanbanBoard() {
                   <Droppable key={stage} droppableId={stage}>
                     {(provided, snapshot) => (
                       <Card
-                        className={`w-80 min-h-[500px] flex-shrink-0 transition-all duration-200 ${
+                        className={`w-80 h-[70vh] min-h-[500px] flex-shrink-0 flex flex-col transition-all duration-200 ${
                           snapshot.isDraggingOver
                             ? "bg-gradient-to-b from-blue-50 to-blue-100 border-blue-300 shadow-lg transform scale-105"
                             : "hover:shadow-md"
@@ -932,7 +932,11 @@ export function KanbanBoard() {
                             </div>
                           )}
                         </CardHeader>
-                        <CardContent ref={provided.innerRef} {...provided.droppableProps} className="space-y-2">
+                        <CardContent
+                          ref={provided.innerRef}
+                          {...provided.droppableProps}
+                          className="space-y-2 flex-1 overflow-y-auto pr-2 scrollbar-thin"
+                        >
                           {getLeadsByStage(stage).map((lead, index) => (
                             <Draggable key={lead.id} draggableId={lead.id.toString()} index={index}>
                               {(provided, snapshot) => (
