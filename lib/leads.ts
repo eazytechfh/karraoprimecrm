@@ -103,6 +103,53 @@ async function fetchAllLeadStatsRows(idEmpresa: number) {
   return allLeads
 }
 
+async function fetchAllLeadsRows(
+  idEmpresa: number,
+  user?: ReturnType<typeof getCurrentUser>,
+): Promise<Lead[]> {
+  const supabase = createClient()
+  const allLeads: Lead[] = []
+  let from = 0
+
+  while (true) {
+    const to = from + DASHBOARD_BATCH_SIZE - 1
+    let query = supabase
+      .from("BASE_DE_LEADS")
+      .select("*")
+      .eq("id_empresa", idEmpresa)
+      .order("created_at", { ascending: false })
+      .range(from, to)
+
+    if (user?.cargo === "sdr") {
+      query = query.or(`sdr_responsavel.eq.${user.nome_usuario},estagio_lead.eq.resgate`)
+    }
+
+    if (user?.cargo === "vendedor") {
+      query = query.eq("vendedor", user.nome_usuario)
+    }
+
+    const { data, error } = await query
+
+    if (error) {
+      throw error
+    }
+
+    if (!data || data.length === 0) {
+      break
+    }
+
+    allLeads.push(...data)
+
+    if (data.length < DASHBOARD_BATCH_SIZE) {
+      break
+    }
+
+    from += DASHBOARD_BATCH_SIZE
+  }
+
+  return allLeads
+}
+
 export async function getAccurateLeadStats(idEmpresa: number) {
   try {
     const leads = await fetchAllLeadStatsRows(idEmpresa)
@@ -175,50 +222,19 @@ export async function createLead(leadData: CreateLeadData): Promise<boolean> {
 }
 
 export async function getLeads(idEmpresa: number): Promise<Lead[]> {
-  const supabase = createClient()
   const user = getCurrentUser()
 
-  if (user && user.cargo === "sdr") {
-    const { data, error } = await supabase
-      .from("BASE_DE_LEADS")
-      .select("*")
-      .eq("id_empresa", idEmpresa)
-      .or(`sdr_responsavel.eq.${user.nome_usuario},estagio_lead.eq.resgate`)
-      .order("created_at", { ascending: false })
+  try {
+    const data = await fetchAllLeadsRows(idEmpresa, user)
 
-    if (error) {
-      console.error("Error fetching leads:", error)
-      return []
-    }
-
-    return (data || []).map((lead) => ({
+    return data.map((lead) => ({
       ...lead,
       estagio_lead: normalizeLeadStage(lead.estagio_lead),
     }))
-  }
-
-  let query = supabase
-    .from("BASE_DE_LEADS")
-    .select("*")
-    .eq("id_empresa", idEmpresa)
-    .order("created_at", { ascending: false })
-
-  // Se for vendedor, filtra apenas os leads atribuídos a ele
-  if (user && user.cargo === "vendedor") {
-    query = query.eq("vendedor", user.nome_usuario)
-  }
-
-  const { data, error } = await query
-
-  if (error) {
+  } catch (error) {
     console.error("Error fetching leads:", error)
     return []
   }
-
-  return (data || []).map((lead) => ({
-    ...lead,
-    estagio_lead: normalizeLeadStage(lead.estagio_lead),
-  }))
 }
 
 export async function updateLeadStage(leadId: number, newStage: string): Promise<boolean> {
