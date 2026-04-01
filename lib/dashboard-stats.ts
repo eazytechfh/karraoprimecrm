@@ -1,4 +1,5 @@
 import { normalizeLeadStage } from "@/lib/leads"
+import { normalizeAgendamentoStage } from "@/lib/agendamentos"
 import { createClient } from "@/utils/supabase/client"
 
 export interface DashboardFilters {
@@ -320,6 +321,7 @@ export async function getDashboardData(idEmpresa: number, filters: DashboardFilt
 
   const sdrAgrupamento = (agendamentos || []).reduce((acc: any, agendamento) => {
     const sdr = agendamento.sdr_responsavel || "Não atribuído"
+    const estagioAgendamento = normalizeAgendamentoStage(agendamento.estagio)
 
     if (!acc[sdr]) {
       acc[sdr] = {
@@ -335,19 +337,21 @@ export async function getDashboardData(idEmpresa: number, filters: DashboardFilt
 
     // Contar por estágio do agendamento
     if (
-      agendamento.estagio === "agendado" ||
-      agendamento.estagio === "realizou_visita" ||
-      agendamento.estagio === "fechou" ||
-      agendamento.estagio === "nao_fechou"
+      estagioAgendamento === "agendado" ||
+      estagioAgendamento === "visita_realizada" ||
+      estagioAgendamento === "sucesso" ||
+      estagioAgendamento === "insucesso" ||
+      estagioAgendamento === "nao_compareceu" ||
+      estagioAgendamento === "reagendado"
     ) {
       acc[sdr].agendamentos_realizados++
     }
 
-    if (agendamento.estagio === "fechou") {
+    if (estagioAgendamento === "sucesso") {
       acc[sdr].agendamentos_fechados++
     }
 
-    if (agendamento.estagio === "nao_fechou") {
+    if (estagioAgendamento === "insucesso") {
       acc[sdr].agendamentos_nao_fechados++
     }
 

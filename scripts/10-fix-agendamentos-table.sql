@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS "AGENDAMENTOS" (
   hora_agendamento TIME,
   vendedor VARCHAR(255),
   -- Removido: id_vendedor INTEGER REFERENCES "VENDEDORES"(id) - tabela não existe
-  estagio_agendamento VARCHAR(50) DEFAULT 'agendar' CHECK (estagio_agendamento IN ('agendar', 'agendado', 'realizou_visita', 'fechou', 'nao_fechou')),
+  estagio_agendamento VARCHAR(50) DEFAULT 'agendar' CHECK (estagio_agendamento IN ('agendar', 'agendado', 'nao_compareceu', 'reagendado', 'visita_realizada', 'sucesso', 'insucesso')),
   observacoes TEXT,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()

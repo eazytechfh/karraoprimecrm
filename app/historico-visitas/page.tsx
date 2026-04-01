@@ -16,6 +16,7 @@ import {
   type Agendamento,
   type Vendedor,
   ESTAGIO_AGENDAMENTO_LABELS,
+  normalizeAgendamentoStage,
 } from "@/lib/agendamentos"
 import { Calendar, Phone, User, Clock, Filter } from "lucide-react"
 
@@ -89,11 +90,11 @@ export default function HistoricoVisitasPage() {
 
     if (filters.status) {
       filtered = filtered.filter((h) => {
-        if (filters.status === "realizou_visita") {
+        if (filters.status === "visita_realizada") {
           return shouldAppearInRealizouVisitaColumn(h)
         }
 
-        return h.estagio_agendamento === filters.status
+        return normalizeAgendamentoStage(h.estagio_agendamento) === filters.status
       })
     }
 
@@ -106,7 +107,7 @@ export default function HistoricoVisitasPage() {
 
     if (filters.ganho) {
       filtered = filtered.filter((h) => {
-        const ganhou = h.estagio_agendamento === "fechou"
+        const ganhou = normalizeAgendamentoStage(h.estagio_agendamento) === "sucesso"
         return filters.ganho === "sim" ? ganhou : !ganhou
       })
     }
@@ -148,14 +149,18 @@ export default function HistoricoVisitasPage() {
 
   const getStatusBadge = (estagio: string) => {
     const colors = {
-      realizou_visita: "bg-purple-100 text-purple-800",
-      fechou: "bg-green-100 text-green-800",
-      nao_fechou: "bg-red-100 text-red-800",
+      visita_realizada: "bg-purple-100 text-purple-800",
+      sucesso: "bg-green-100 text-green-800",
+      insucesso: "bg-red-100 text-red-800",
+      reagendado: "bg-indigo-100 text-indigo-800",
+      nao_compareceu: "bg-amber-100 text-amber-800",
     }
 
+    const normalizedStage = normalizeAgendamentoStage(estagio)
+
     return (
-      <Badge className={colors[estagio as keyof typeof colors] || "bg-gray-100 text-gray-800"}>
-        {ESTAGIO_AGENDAMENTO_LABELS[estagio as keyof typeof ESTAGIO_AGENDAMENTO_LABELS] || estagio}
+      <Badge className={colors[normalizedStage as keyof typeof colors] || "bg-gray-100 text-gray-800"}>
+        {ESTAGIO_AGENDAMENTO_LABELS[normalizedStage as keyof typeof ESTAGIO_AGENDAMENTO_LABELS] || estagio}
       </Badge>
     )
   }
@@ -277,16 +282,17 @@ export default function HistoricoVisitasPage() {
                   <SelectValue placeholder="Todos os status" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="realizou_visita">Realizou Visita</SelectItem>
-                  <SelectItem value="agendar">Não Realizou Visita (Reagendada)</SelectItem>
-                  <SelectItem value="fechou">Fechou</SelectItem>
-                  <SelectItem value="nao_fechou">Não Fechou</SelectItem>
+                  <SelectItem value="visita_realizada">Visita Realizada</SelectItem>
+                  <SelectItem value="nao_compareceu">Não Compareceu</SelectItem>
+                  <SelectItem value="reagendado">Reagendado</SelectItem>
+                  <SelectItem value="sucesso">Sucesso</SelectItem>
+                  <SelectItem value="insucesso">Insucesso</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">Realizou Visita</label>
+              <label className="text-sm font-medium text-gray-700">Visita Realizada</label>
               <Select value={filters.realizouVisita} onValueChange={(value) => handleFilterChange("realizouVisita", value)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Todos" />
@@ -299,7 +305,7 @@ export default function HistoricoVisitasPage() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">Ganho</label>
+              <label className="text-sm font-medium text-gray-700">Sucesso</label>
               <Select value={filters.ganho} onValueChange={(value) => handleFilterChange("ganho", value)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Todos" />
@@ -355,8 +361,8 @@ export default function HistoricoVisitasPage() {
                     <TableHead>SDR Responsável</TableHead>
                     <TableHead>Data da Venda</TableHead>
                     <TableHead>Data Agendamento</TableHead>
-                    <TableHead>Realizou Visita</TableHead>
-                    <TableHead>Ganho</TableHead>
+                    <TableHead>Visita Realizada</TableHead>
+                    <TableHead>Sucesso</TableHead>
                     <TableHead>Status Final</TableHead>
                     <TableHead>Última Atualização</TableHead>
                     {filteredHistorico.some((h) => h.motivo_perda) && <TableHead>Motivo</TableHead>}
@@ -367,7 +373,7 @@ export default function HistoricoVisitasPage() {
                     <TableRow key={visita.id}>
                       {(() => {
                         const realizouVisita = shouldAppearInRealizouVisitaColumn(visita)
-                        const ganhou = visita.estagio_agendamento === "fechou"
+                        const ganhou = normalizeAgendamentoStage(visita.estagio_agendamento) === "sucesso"
                         return (
                           <>
                       <TableCell className="font-medium">{visita.nome_lead}</TableCell>
@@ -384,7 +390,7 @@ export default function HistoricoVisitasPage() {
                           <div className="flex items-center gap-1 text-sm">
                             <Calendar className="h-3 w-3 text-gray-400" />
                             {new Date(visita.data_venda + "T00:00:00").toLocaleDateString("pt-BR")}
-                            {visita.updated_at && visita.estagio_agendamento === "fechou" && (
+                            {visita.updated_at && normalizeAgendamentoStage(visita.estagio_agendamento) === "sucesso" && (
                               <>
                                 {" • "}
                                 <Clock className="h-3 w-3 text-gray-400" />

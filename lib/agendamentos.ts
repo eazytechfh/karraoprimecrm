@@ -50,20 +50,53 @@ export interface Vendedor {
 export const ESTAGIO_AGENDAMENTO_LABELS = {
   agendar: "Agendar",
   agendado: "Agendado",
-  realizou_visita: "Realizou a Visita",
-  fechou: "Fechou",
-  nao_fechou: "Não Fechou",
+  nao_compareceu: "Não Compareceu",
+  reagendado: "Reagendado",
+  visita_realizada: "Visita Realizada",
+  sucesso: "Sucesso",
+  insucesso: "Insucesso",
 }
 
 export const ESTAGIO_AGENDAMENTO_COLORS = {
   agendar: "bg-blue-100 text-blue-800",
   agendado: "bg-cyan-100 text-cyan-800",
-  realizou_visita: "bg-purple-100 text-purple-800",
-  fechou: "bg-emerald-100 text-emerald-800",
-  nao_fechou: "bg-red-100 text-red-800",
+  nao_compareceu: "bg-amber-100 text-amber-800",
+  reagendado: "bg-indigo-100 text-indigo-800",
+  visita_realizada: "bg-purple-100 text-purple-800",
+  sucesso: "bg-emerald-100 text-emerald-800",
+  insucesso: "bg-red-100 text-red-800",
 }
 
-export const VALID_ESTAGIOS_AGENDAMENTO = ["agendar", "agendado", "realizou_visita", "fechou", "nao_fechou"]
+export const VALID_ESTAGIOS_AGENDAMENTO = [
+  "agendar",
+  "agendado",
+  "nao_compareceu",
+  "reagendado",
+  "visita_realizada",
+  "sucesso",
+  "insucesso",
+]
+
+const ESTAGIO_AGENDAMENTO_NORMALIZATION: Record<string, string> = {
+  agendar: "agendar",
+  agendado: "agendado",
+  nao_compareceu: "nao_compareceu",
+  "não compareceu": "nao_compareceu",
+  reagendado: "reagendado",
+  visita_realizada: "visita_realizada",
+  realizou_visita: "visita_realizada",
+  "realizou a visita": "visita_realizada",
+  sucesso: "sucesso",
+  fechou: "sucesso",
+  insucesso: "insucesso",
+  nao_fechou: "insucesso",
+  "não fechou": "insucesso",
+}
+
+export function normalizeAgendamentoStage(estagio?: string | null): string {
+  if (!estagio) return "agendar"
+  return ESTAGIO_AGENDAMENTO_NORMALIZATION[estagio.toLowerCase().trim()] || estagio
+}
 
 export interface AgendamentoCheckboxFlags {
   hasFlags: boolean
@@ -87,11 +120,13 @@ export function parseAgendamentoCheckboxFlags(observacoes?: string): Agendamento
 }
 
 export function shouldAppearInRealizouVisitaColumn(agendamento: Pick<Agendamento, "estagio_agendamento" | "observacoes">) {
-  if (agendamento.estagio_agendamento === "realizou_visita") {
+  const estagio = normalizeAgendamentoStage(agendamento.estagio_agendamento)
+
+  if (estagio === "visita_realizada") {
     return true
   }
 
-  if (agendamento.estagio_agendamento !== "fechou") {
+  if (estagio !== "sucesso") {
     return false
   }
 
@@ -115,20 +150,20 @@ export type MotivoPerda = (typeof MOTIVOS_PERDA)[number]
 
 export const REGRAS_MOVIMENTACAO: Record<string, { de: string[]; para: string[] }> = {
   sdr: {
-    de: ["agendar", "agendado", "realizou_visita", "fechou", "nao_fechou"],
-    para: ["agendar", "agendado", "realizou_visita", "fechou", "nao_fechou"],
+    de: VALID_ESTAGIOS_AGENDAMENTO,
+    para: VALID_ESTAGIOS_AGENDAMENTO,
   },
   vendedor: {
-    de: ["agendar", "agendado", "realizou_visita", "fechou", "nao_fechou"],
-    para: ["agendar", "agendado", "realizou_visita", "fechou", "nao_fechou"],
+    de: VALID_ESTAGIOS_AGENDAMENTO,
+    para: VALID_ESTAGIOS_AGENDAMENTO,
   },
   gestor: {
-    de: ["agendar", "agendado", "realizou_visita", "fechou", "nao_fechou"],
-    para: ["agendar", "agendado", "realizou_visita", "fechou", "nao_fechou"],
+    de: VALID_ESTAGIOS_AGENDAMENTO,
+    para: VALID_ESTAGIOS_AGENDAMENTO,
   },
   administrador: {
-    de: ["agendar", "agendado", "realizou_visita", "fechou", "nao_fechou"],
-    para: ["agendar", "agendado", "realizou_visita", "fechou", "nao_fechou"],
+    de: VALID_ESTAGIOS_AGENDAMENTO,
+    para: VALID_ESTAGIOS_AGENDAMENTO,
   },
 }
 
@@ -152,7 +187,9 @@ export function canMoveStage(cargo: string | undefined, estagioAtual: string, es
     return false
   }
 
-  const canMove = regras.de.includes(estagioAtual) && regras.para.includes(estagioNovo)
+  const estagioAtualNormalizado = normalizeAgendamentoStage(estagioAtual)
+  const estagioNovoNormalizado = normalizeAgendamentoStage(estagioNovo)
+  const canMove = regras.de.includes(estagioAtualNormalizado) && regras.para.includes(estagioNovoNormalizado)
   console.log("[v0] canMoveStage result:", canMove, { regras })
   return canMove
 }
@@ -196,7 +233,10 @@ export async function getAgendamentos(idEmpresa: number): Promise<Agendamento[]>
     }
 
     console.log("[v0] Total de agendamentos retornados para SDR:", agendamentosData?.length || 0)
-    return agendamentosData || []
+    return (agendamentosData || []).map((agendamento) => ({
+      ...agendamento,
+      estagio_agendamento: normalizeAgendamentoStage(agendamento.estagio_agendamento),
+    }))
   }
 
   let query = supabase
@@ -218,7 +258,10 @@ export async function getAgendamentos(idEmpresa: number): Promise<Agendamento[]>
   }
 
   console.log("[v0] Agendamentos retornados:", data?.length || 0)
-  return data || []
+  return (data || []).map((agendamento) => ({
+    ...agendamento,
+    estagio_agendamento: normalizeAgendamentoStage(agendamento.estagio_agendamento),
+  }))
 }
 
 export async function getAgendamentosByLead(idLead: number): Promise<Agendamento[]> {
@@ -235,16 +278,23 @@ export async function getAgendamentosByLead(idLead: number): Promise<Agendamento
     return []
   }
 
-  return data || []
+  return (data || []).map((agendamento) => ({
+    ...agendamento,
+    estagio_agendamento: normalizeAgendamentoStage(agendamento.estagio_agendamento),
+  }))
 }
 
 export async function createAgendamento(
   agendamento: Omit<Agendamento, "id" | "created_at" | "updated_at">,
 ): Promise<Agendamento | null> {
   const supabase = createClient()
+  const payload = {
+    ...agendamento,
+    estagio_agendamento: normalizeAgendamentoStage(agendamento.estagio_agendamento),
+  }
 
   try {
-    const { data, error } = await supabase.from("AGENDAMENTOS").insert([agendamento]).select()
+    const { data, error } = await supabase.from("AGENDAMENTOS").insert([payload]).select()
 
     if (error) {
       console.error("Error creating agendamento:", error)
@@ -260,15 +310,21 @@ export async function createAgendamento(
 
 export async function updateAgendamento(id: number, updates: Partial<Agendamento>): Promise<boolean> {
   const supabase = createClient()
+  const normalizedUpdates = {
+    ...updates,
+    ...(updates.estagio_agendamento
+      ? { estagio_agendamento: normalizeAgendamentoStage(updates.estagio_agendamento) }
+      : {}),
+  }
 
   try {
     console.log("[v0] updateAgendamento - id:", id)
-    console.log("[v0] updateAgendamento - updates:", updates)
+    console.log("[v0] updateAgendamento - updates:", normalizedUpdates)
 
     const { error } = await supabase
       .from("AGENDAMENTOS")
       .update({
-        ...updates,
+        ...normalizedUpdates,
         updated_at: new Date().toISOString(),
       })
       .eq("id", id)
@@ -304,9 +360,11 @@ export async function updateAgendamentoStage(id: number, novoEstagio: string): P
     return false
   }
 
-  const result = await updateAgendamento(id, { estagio_agendamento: novoEstagio })
+  const estagioAtual = normalizeAgendamentoStage(agendamento.estagio_agendamento)
+  const estagioNovo = normalizeAgendamentoStage(novoEstagio)
+  const result = await updateAgendamento(id, { estagio_agendamento: estagioNovo })
 
-  if (result && novoEstagio === "agendado") {
+  if (result && estagioNovo === "agendado") {
     await sendNotificaVendedorWebhook(agendamento)
   }
 
@@ -314,8 +372,8 @@ export async function updateAgendamentoStage(id: number, novoEstagio: string): P
     await registrarHistoricoMovimentacao(
       id,
       agendamento.id_empresa,
-      agendamento.estagio_agendamento,
-      novoEstagio,
+      estagioAtual,
+      estagioNovo,
       user.nome_usuario,
       user.cargo || "",
     )
@@ -343,16 +401,18 @@ export async function updateAgendamentoStageWithMotivo(
     return false
   }
 
-  const updates: Partial<Agendamento> = { estagio_agendamento: novoEstagio }
+  const estagioAtual = normalizeAgendamentoStage(agendamento.estagio_agendamento)
+  const estagioNovo = normalizeAgendamentoStage(novoEstagio)
+  const updates: Partial<Agendamento> = { estagio_agendamento: estagioNovo }
 
-  if (novoEstagio === "nao_fechou" && motivoPerda) {
+  if (estagioNovo === "insucesso" && motivoPerda) {
     updates.motivo_perda = motivoPerda
     updates.data_perda = new Date().toISOString().split("T")[0]
   }
 
   const result = await updateAgendamento(id, updates)
 
-  if (result && novoEstagio === "agendado") {
+  if (result && estagioNovo === "agendado") {
     await sendNotificaVendedorWebhook(agendamento)
   }
 
@@ -360,8 +420,8 @@ export async function updateAgendamentoStageWithMotivo(
     await registrarHistoricoMovimentacao(
       id,
       agendamento.id_empresa,
-      agendamento.estagio_agendamento,
-      novoEstagio,
+      estagioAtual,
+      estagioNovo,
       user.nome_usuario,
       user.cargo || "",
       motivoPerda,
@@ -590,7 +650,7 @@ export async function getHistoricoVisitas(
     .from("AGENDAMENTOS")
     .select("*")
     .eq("id_empresa", idEmpresa)
-    .in("estagio_agendamento", ["realizou_visita", "fechou", "nao_fechou", "agendar"]) // Added "agendar" for reagendadas
+    .in("estagio_agendamento", ["agendar", "nao_compareceu", "reagendado", "visita_realizada", "sucesso", "insucesso"])
     .order("updated_at", { ascending: false })
 
   // Filter by vendedor role
@@ -613,7 +673,7 @@ export async function getHistoricoVisitas(
   }
 
   if (filters?.status) {
-    query = query.eq("estagio_agendamento", filters.status)
+    query = query.eq("estagio_agendamento", normalizeAgendamentoStage(filters.status))
   }
 
   if (filters?.periodo === "hoje") {
@@ -642,7 +702,10 @@ export async function getHistoricoVisitas(
     return []
   }
 
-  return data || []
+  return (data || []).map((agendamento) => ({
+    ...agendamento,
+    estagio_agendamento: normalizeAgendamentoStage(agendamento.estagio_agendamento),
+  }))
 }
 
 export async function marcarRealizouVisita(id: number): Promise<boolean> {
@@ -660,14 +723,14 @@ export async function marcarRealizouVisita(id: number): Promise<boolean> {
     return false
   }
 
-  const result = await updateAgendamento(id, { estagio_agendamento: "realizou_visita" })
+  const result = await updateAgendamento(id, { estagio_agendamento: "visita_realizada" })
 
   if (result) {
     await registrarHistoricoMovimentacao(
       id,
       agendamento.id_empresa,
-      agendamento.estagio_agendamento,
-      "realizou_visita",
+      normalizeAgendamentoStage(agendamento.estagio_agendamento),
+      "visita_realizada",
       user.nome_usuario,
       user.cargo || "",
       undefined,
@@ -693,14 +756,14 @@ export async function reagendarVisita(id: number): Promise<boolean> {
     return false
   }
 
-  const result = await updateAgendamento(id, { estagio_agendamento: "agendar" })
+  const result = await updateAgendamento(id, { estagio_agendamento: "reagendado" })
 
   if (result) {
     await registrarHistoricoMovimentacao(
       id,
       agendamento.id_empresa,
-      agendamento.estagio_agendamento,
-      "agendar",
+      normalizeAgendamentoStage(agendamento.estagio_agendamento),
+      "reagendado",
       user.nome_usuario,
       user.cargo || "",
       undefined,
@@ -718,7 +781,7 @@ export async function registrarVenda(
   valorVenda: number,
 ): Promise<boolean> {
   const updates: Partial<Agendamento> = {
-    estagio_agendamento: "fechou",
+    estagio_agendamento: "sucesso",
     data_venda: dataVenda,
     veiculo_vendido: veiculoVendido,
     valor_venda: valorVenda,

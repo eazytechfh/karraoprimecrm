@@ -22,6 +22,7 @@ import {
   type HistoricoMovimentacao,
   ESTAGIO_AGENDAMENTO_LABELS,
   VALID_ESTAGIOS_AGENDAMENTO,
+  normalizeAgendamentoStage,
   updateAgendamento,
   updateAgendamentoStageWithMotivo,
   type MotivoPerda,
@@ -56,7 +57,15 @@ import { RegistrarVendaModal } from "@/components/registrar-venda-modal"
 import { VehicleAutocomplete } from "./vehicle-autocomplete"
 import { createClient } from "@/utils/supabase/client"
 
-const COLUNAS_KANBAN_AGENDAMENTOS = ["agendar", "agendado", "realizou_visita", "fechou", "nao_fechou"]
+const COLUNAS_KANBAN_AGENDAMENTOS = [
+  "agendar",
+  "agendado",
+  "nao_compareceu",
+  "reagendado",
+  "visita_realizada",
+  "sucesso",
+  "insucesso",
+]
 const CHECKBOX_FLAGS_PREFIX = "__flags__:"
 
 function parseCheckboxFlagsFromObservacoes(observacoes?: string) {
@@ -158,7 +167,7 @@ function DraggableCard({
             disabled={isMoving}
           >
             <Check className="h-3 w-3 mr-1" />
-            Vendido
+            Sucesso
           </Button>
           <Button
             size="sm"
@@ -170,7 +179,7 @@ function DraggableCard({
             disabled={isMoving}
           >
             <Check className="h-3 w-3 mr-1" />
-            Realizou visita
+            Visita realizada
           </Button>
           <Button
             size="sm"
@@ -183,7 +192,7 @@ function DraggableCard({
             disabled={isMoving}
           >
             <X className="h-3 w-3 mr-1" />
-            Não realizou visita
+            Não compareceu
           </Button>
         </CardContent>
       )}
@@ -302,10 +311,10 @@ export function AgendamentosKanban() {
     const { id: droppableId } = over
 
     const agendamentoId = Number.parseInt(draggableId)
-    const newStage = droppableId
+    const newStage = normalizeAgendamentoStage(String(droppableId))
 
     const agendamento = agendamentos.find((a) => a.id === agendamentoId)
-    const oldStage = agendamento?.estagio_agendamento || ""
+    const oldStage = normalizeAgendamentoStage(agendamento?.estagio_agendamento || "")
 
     console.log("[v0] handleDragEnd:", { agendamentoId, oldStage, newStage, cargo: currentUser?.cargo })
 
@@ -362,7 +371,7 @@ export function AgendamentosKanban() {
       }
     }
 
-    if (newStage === "fechou") {
+    if (newStage === "sucesso") {
       if (agendamento) {
         setPendingMove({ agendamentoId, oldStage, agendamento })
         setShowRegistrarVendaModal(true)
@@ -370,7 +379,7 @@ export function AgendamentosKanban() {
       return
     }
 
-    if (newStage === "nao_fechou") {
+    if (newStage === "insucesso") {
       if (agendamento) {
         setPendingMove({ agendamentoId, oldStage, agendamento })
         setShowMotivoPerdaModal(true)
@@ -394,7 +403,7 @@ export function AgendamentosKanban() {
               estagio_agendamento: newStage,
               updated_at: new Date().toISOString(),
               motivo_perda: motivoPerda || a.motivo_perda,
-              data_perda: newStage === "nao_fechou" ? new Date().toISOString().split("T")[0] : a.data_perda,
+              data_perda: newStage === "insucesso" ? new Date().toISOString().split("T")[0] : a.data_perda,
             }
           : a,
       ),
@@ -430,20 +439,20 @@ export function AgendamentosKanban() {
             type: "success",
             text: "Agendamento confirmado! Notificação enviada para o vendedor.",
           })
-        } else if (newStage === "realizou_visita") {
+        } else if (newStage === "visita_realizada") {
           setStatusMessage({
             type: "success",
             text: "Visita realizada com sucesso!",
           })
-        } else if (newStage === "fechou") {
+        } else if (newStage === "sucesso") {
           setStatusMessage({
             type: "success",
-            text: "Venda realizada com sucesso!",
+            text: "Sucesso registrado com sucesso!",
           })
-        } else if (newStage === "nao_fechou") {
+        } else if (newStage === "insucesso") {
           setStatusMessage({
             type: "success",
-            text: "Venda não concretizada!",
+            text: "Insucesso registrado!",
           })
         } else {
           setStatusMessage({
@@ -475,7 +484,7 @@ export function AgendamentosKanban() {
           a.id === pendingMove.agendamentoId
             ? {
                 ...a,
-                estagio_agendamento: "fechou",
+                estagio_agendamento: "sucesso",
                 data_venda: data,
                 veiculo_vendido: veiculo,
                 valor_venda: valor,
@@ -487,7 +496,7 @@ export function AgendamentosKanban() {
 
       try {
         const success = await updateAgendamento(pendingMove.agendamentoId, {
-          estagio_agendamento: "fechou",
+          estagio_agendamento: "sucesso",
           data_venda: data,
           veiculo_vendido: veiculo,
           valor_venda: valor,
@@ -510,7 +519,7 @@ export function AgendamentosKanban() {
               pendingMove.agendamentoId,
               pendingMove.agendamento.id_empresa,
               pendingMove.oldStage,
-              "fechou",
+              "sucesso",
               currentUser.nome_usuario,
               currentUser.cargo || "desconhecido",
               undefined,
@@ -520,7 +529,7 @@ export function AgendamentosKanban() {
 
           setStatusMessage({
             type: "success",
-            text: "Venda realizada com sucesso!",
+            text: "Sucesso registrado com sucesso!",
           })
         }
       } catch (error) {
@@ -549,15 +558,16 @@ export function AgendamentosKanban() {
   const handleConfirmMotivoPerda = async (motivo: MotivoPerda, data: string) => {
     if (pendingMove) {
       setShowMotivoPerdaModal(false)
-      await executeMove(pendingMove.agendamentoId, "nao_fechou", pendingMove.oldStage, motivo)
+      await executeMove(pendingMove.agendamentoId, "insucesso", pendingMove.oldStage, motivo)
       setPendingMove(null)
     }
   }
 
   const handleOpenAgendamento = async (agendamento: Agendamento) => {
     const parsed = parseCheckboxFlagsFromObservacoes(agendamento.observacoes)
-    const isGanho = parsed.hasFlags ? parsed.ganho : agendamento.estagio_agendamento === "fechou"
-    const isRealizouVisita = parsed.hasFlags ? parsed.realizouVisita : agendamento.estagio_agendamento === "realizou_visita"
+    const normalizedStage = normalizeAgendamentoStage(agendamento.estagio_agendamento)
+    const isGanho = parsed.hasFlags ? parsed.ganho : normalizedStage === "sucesso"
+    const isRealizouVisita = parsed.hasFlags ? parsed.realizouVisita : normalizedStage === "visita_realizada"
 
     setSelectedAgendamento(agendamento)
     setFormData({
@@ -610,12 +620,12 @@ export function AgendamentosKanban() {
         updates.data_agendamento &&
         updates.hora_agendamento &&
         updates.vendedor &&
-        selectedAgendamento.estagio_agendamento === "agendar"
+        ["agendar", "reagendado", "nao_compareceu"].includes(normalizeAgendamentoStage(selectedAgendamento.estagio_agendamento))
 
       if (formData.ganho) {
-        updates.estagio_agendamento = "fechou"
+        updates.estagio_agendamento = "sucesso"
       } else if (formData.realizou_visita) {
-        updates.estagio_agendamento = "realizou_visita"
+        updates.estagio_agendamento = "visita_realizada"
       } else if (hasRequiredFields) {
         updates.estagio_agendamento = "agendado"
       }
@@ -647,7 +657,7 @@ export function AgendamentosKanban() {
             await registrarHistoricoMovimentacao(
               newAgendamento.id,
               newAgendamento.id_empresa,
-              "agendar",
+              normalizeAgendamentoStage(selectedAgendamento.estagio_agendamento),
               "agendado",
               currentUser.nome_usuario,
               currentUser.cargo || "desconhecido",
@@ -687,7 +697,7 @@ export function AgendamentosKanban() {
           await registrarHistoricoMovimentacao(
             selectedAgendamento.id,
             selectedAgendamento.id_empresa,
-            "agendar",
+            normalizeAgendamentoStage(selectedAgendamento.estagio_agendamento),
             "agendado",
             currentUser.nome_usuario,
             currentUser.cargo || "desconhecido",
@@ -783,20 +793,22 @@ export function AgendamentosKanban() {
   }
 
   const getAgendamentosByStage = (stage: string) => {
-    if (stage !== "realizou_visita") {
-      return filteredAgendamentos.filter((a) => a.estagio_agendamento === stage)
+    if (stage !== "visita_realizada") {
+      return filteredAgendamentos.filter((a) => normalizeAgendamentoStage(a.estagio_agendamento) === stage)
     }
 
-    const realizouVisita = filteredAgendamentos.filter((a) => a.estagio_agendamento === "realizou_visita")
-    const fechadosEspelho = filteredAgendamentos
+    const realizouVisita = filteredAgendamentos.filter(
+      (a) => normalizeAgendamentoStage(a.estagio_agendamento) === "visita_realizada",
+    )
+    const sucessosEspelho = filteredAgendamentos
       .filter((a) => {
-        if (a.estagio_agendamento !== "fechou") return false
+        if (normalizeAgendamentoStage(a.estagio_agendamento) !== "sucesso") return false
         const flags = parseCheckboxFlagsFromObservacoes(a.observacoes)
         return flags.ganho && flags.realizouVisita
       })
-      .map((a) => ({ ...a, __mirrorFromFechou: true }))
+      .map((a) => ({ ...a, __mirrorFromSucesso: true }))
 
-    return [...realizouVisita, ...fechadosEspelho]
+    return [...realizouVisita, ...sucessosEspelho]
   }
 
   const formatHistoricoDate = (dateString: string) => {
@@ -826,7 +838,7 @@ export function AgendamentosKanban() {
     setAgendamentos((prev) =>
       prev.map((a) =>
         a.id === agendamento.id
-          ? { ...a, estagio_agendamento: "realizou_visita", updated_at: new Date().toISOString() }
+          ? { ...a, estagio_agendamento: "visita_realizada", updated_at: new Date().toISOString() }
           : a,
       ),
     )
@@ -876,7 +888,7 @@ export function AgendamentosKanban() {
     setAgendamentos((prev) =>
       prev.map((a) =>
         a.id === agendamentoParaNaoRealizou.id
-          ? { ...a, estagio_agendamento: "agendar", updated_at: new Date().toISOString() }
+          ? { ...a, estagio_agendamento: "reagendado", updated_at: new Date().toISOString() }
           : a,
       ),
     )
@@ -937,7 +949,7 @@ export function AgendamentosKanban() {
         a.id === agendamento.id
           ? {
               ...a,
-              estagio_agendamento: "fechou",
+              estagio_agendamento: "sucesso",
               data_venda: dataVenda,
               updated_at: now.toISOString(),
             }
@@ -947,7 +959,7 @@ export function AgendamentosKanban() {
 
     try {
       const success = await updateAgendamento(agendamento.id, {
-        estagio_agendamento: "fechou",
+        estagio_agendamento: "sucesso",
         data_venda: dataVenda,
       })
 
@@ -966,7 +978,7 @@ export function AgendamentosKanban() {
             agendamento.id,
             agendamento.id_empresa,
             "agendado",
-            "fechou",
+            "sucesso",
             currentUser.nome_usuario,
             currentUser.cargo || "desconhecido",
             undefined,
@@ -976,7 +988,7 @@ export function AgendamentosKanban() {
 
         setStatusMessage({
           type: "success",
-          text: "Venda realizada com sucesso!",
+          text: "Sucesso registrado com sucesso!",
         })
       }
     } catch (error) {
@@ -1111,7 +1123,7 @@ export function AgendamentosKanban() {
                         <Badge variant="secondary" className="font-mono">
                           {agendamentosColuna.length}
                         </Badge>
-                        {coluna === "fechou" && total > 0 && (
+                        {coluna === "sucesso" && total > 0 && (
                           <Badge variant="default" className="text-xs bg-green-600">
                             R$ {total.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </Badge>
@@ -1124,9 +1136,9 @@ export function AgendamentosKanban() {
                       <p className="text-sm text-muted-foreground text-center py-4">Nenhum agendamento</p>
                     ) : (
                       agendamentosColuna.map((agendamento: any) =>
-                        agendamento.__mirrorFromFechou ? (
+                        agendamento.__mirrorFromSucesso ? (
                           <Card
-                            key={`mirror-fechou-${agendamento.id}`}
+                            key={`mirror-sucesso-${agendamento.id}`}
                             className="transition-all duration-200 cursor-pointer border-green-200 bg-green-50/30"
                             onClick={() => handleOpenAgendamento(agendamento)}
                           >
@@ -1140,7 +1152,7 @@ export function AgendamentosKanban() {
                                       {agendamento.telefone}
                                     </p>
                                   )}
-                                  <p className="text-xs text-green-700 mt-2">Espelho de "Fechou"</p>
+                                  <p className="text-xs text-green-700 mt-2">Espelho de "Sucesso"</p>
                                 </div>
                               </div>
                             </CardHeader>
@@ -1298,7 +1310,7 @@ export function AgendamentosKanban() {
                         }
                         disabled={!canEdit}
                       />
-                      Realizou Visita
+                      Visita Realizada
                     </label>
                     <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
                       <input
@@ -1313,7 +1325,7 @@ export function AgendamentosKanban() {
                         }
                         disabled={!canEdit}
                       />
-                      Ganho
+                      Sucesso
                     </label>
                   </div>
 
@@ -1459,18 +1471,15 @@ export function AgendamentosKanban() {
       <Dialog open={showNaoRealizouModal} onOpenChange={setShowNaoRealizouModal}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Cliente não realizou a visita</DialogTitle>
+            <DialogTitle>Cliente não compareceu</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <p className="text-sm text-gray-600">O que deseja fazer com este agendamento?</p>
             <div className="space-y-2">
-              <Button
-                className="w-full justify-start bg-blue-600 hover:bg-blue-700 text-white"
-                onClick={handleReagendar}
-              >
+              <Button className="w-full justify-start bg-blue-600 hover:bg-blue-700 text-white" onClick={handleReagendar}>
                 <Calendar className="h-4 w-4 mr-2" />
                 Reagendar
-                <span className="ml-auto text-xs opacity-80">Voltar para Agendar</span>
+                <span className="ml-auto text-xs opacity-80">Mover para Reagendado</span>
               </Button>
               <Button
                 variant="outline"
@@ -1478,7 +1487,7 @@ export function AgendamentosKanban() {
                 onClick={handleNaoFechouFromModal}
               >
                 <X className="h-4 w-4 mr-2" />
-                Não Fechou
+                Insucesso
                 <span className="ml-auto text-xs opacity-80">Registrar motivo</span>
               </Button>
             </div>

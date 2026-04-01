@@ -23,6 +23,8 @@ import {
   type Agendamento,
   type Vendedor,
   ESTAGIO_AGENDAMENTO_LABELS,
+  ESTAGIO_AGENDAMENTO_COLORS,
+  normalizeAgendamentoStage,
 } from "@/lib/agendamentos"
 import { getCurrentUser, type User } from "@/lib/auth"
 import {
@@ -185,7 +187,7 @@ export function AgendamentosListView() {
     }
 
     if (filterEstagio && filterEstagio !== "all") {
-      filtered = filtered.filter((a) => a.estagio_agendamento === filterEstagio)
+      filtered = filtered.filter((a) => normalizeAgendamentoStage(a.estagio_agendamento) === filterEstagio)
     }
 
     // Filtro por período de entrada (created_at)
@@ -303,8 +305,9 @@ export function AgendamentosListView() {
 
   const handleOpenAgendamento = (agendamento: Agendamento) => {
     const parsed = parseCheckboxFlagsFromObservacoes(agendamento.observacoes)
-    const isGanho = parsed.hasFlags ? parsed.ganho : agendamento.estagio_agendamento === "fechou"
-    const isRealizouVisita = parsed.hasFlags ? parsed.realizouVisita : agendamento.estagio_agendamento === "realizou_visita"
+    const normalizedStage = normalizeAgendamentoStage(agendamento.estagio_agendamento)
+    const isGanho = parsed.hasFlags ? parsed.ganho : normalizedStage === "sucesso"
+    const isRealizouVisita = parsed.hasFlags ? parsed.realizouVisita : normalizedStage === "visita_realizada"
 
     setSelectedAgendamento(agendamento)
     setFormData({
@@ -323,9 +326,9 @@ export function AgendamentosListView() {
 
     let estagio_agendamento = selectedAgendamento.estagio_agendamento
     if (formData.ganho) {
-      estagio_agendamento = "fechou"
+      estagio_agendamento = "sucesso"
     } else if (formData.realizou_visita) {
-      estagio_agendamento = "realizou_visita"
+      estagio_agendamento = "visita_realizada"
     }
 
     await updateAgendamento(selectedAgendamento.id, {
@@ -375,7 +378,9 @@ export function AgendamentosListView() {
       agendamento.data_agendamento ? new Date(agendamento.data_agendamento).toLocaleDateString("pt-BR") : "",
       agendamento.hora_agendamento || "",
       agendamento.vendedor || "",
-      ESTAGIO_AGENDAMENTO_LABELS[agendamento.estagio_agendamento as keyof typeof ESTAGIO_AGENDAMENTO_LABELS] ||
+      ESTAGIO_AGENDAMENTO_LABELS[
+        normalizeAgendamentoStage(agendamento.estagio_agendamento) as keyof typeof ESTAGIO_AGENDAMENTO_LABELS
+      ] ||
         agendamento.estagio_agendamento ||
         "",
       agendamento.observacoes || "",
@@ -649,14 +654,18 @@ export function AgendamentosListView() {
                       <TableCell>
                         <Badge
                           className={
-                            ESTAGIO_AGENDAMENTO_LABELS[
-                              agendamento.estagio_agendamento as keyof typeof ESTAGIO_AGENDAMENTO_LABELS
-                            ]
+                            ESTAGIO_AGENDAMENTO_COLORS[
+                              normalizeAgendamentoStage(
+                                agendamento.estagio_agendamento,
+                              ) as keyof typeof ESTAGIO_AGENDAMENTO_COLORS
+                            ] || "bg-gray-100 text-gray-800"
                           }
                         >
                           {
                             ESTAGIO_AGENDAMENTO_LABELS[
-                              agendamento.estagio_agendamento as keyof typeof ESTAGIO_AGENDAMENTO_LABELS
+                              normalizeAgendamentoStage(
+                                agendamento.estagio_agendamento,
+                              ) as keyof typeof ESTAGIO_AGENDAMENTO_LABELS
                             ]
                           }
                         </Badge>
@@ -761,7 +770,7 @@ export function AgendamentosListView() {
                     }
                     disabled={!userCanEdit && !isSdr}
                   />
-                  Realizou Visita
+                  Visita Realizada
                 </label>
 
                 <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
@@ -777,7 +786,7 @@ export function AgendamentosListView() {
                     }
                     disabled={!userCanEdit && !isSdr}
                   />
-                  Ganho
+                  Sucesso
                 </label>
               </div>
 
