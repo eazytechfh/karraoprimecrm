@@ -582,10 +582,9 @@ export function KanbanBoard() {
     })
   }
 
-  const handleVendedorSelected = () => {
-    if (selectedVendedor) {
-      setShowConfirmation(true)
-    }
+  const handleVendedorSelected = async () => {
+    if (!selectedVendedor || transferring) return
+    await handleConfirmTransfer()
   }
 
   const handleConfirmTransfer = async () => {
@@ -634,7 +633,6 @@ export function KanbanBoard() {
         }
 
         setShowTransferDialog(false)
-        setShowConfirmation(false)
         setShowSuccessMessage(true)
         setLeadToTransfer(null)
         setSelectedVendedor("")
@@ -729,10 +727,17 @@ export function KanbanBoard() {
                 </Button>
                 <Button
                   onClick={handleVendedorSelected}
-                  disabled={!selectedVendedor}
+                  disabled={!selectedVendedor || transferring}
                   className="bg-blue-500 hover:bg-blue-600"
                 >
-                  Continuar
+                  {transferring ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Transferindo...
+                    </>
+                  ) : (
+                    "Continuar"
+                  )}
                 </Button>
               </div>
             </div>
