@@ -17,6 +17,7 @@ import {
   getAgendamentos,
   deleteAgendamento,
   getVendedores,
+  formatAgendamentoDate,
   type Agendamento,
   type Vendedor,
   type HistoricoMovimentacao,
@@ -141,7 +142,7 @@ function DraggableCard({
             {agendamento.data_agendamento && (
               <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
                 <Calendar className="h-3 w-3" />
-                {new Date(agendamento.data_agendamento).toLocaleDateString("pt-BR")}
+                {formatAgendamentoDate(agendamento.data_agendamento)}
                 {agendamento.hora_agendamento && (
                   <>
                     {" • "}
@@ -1217,7 +1218,7 @@ export function AgendamentosKanban() {
                           <div>
                             <span className="text-blue-700 font-medium">Data:</span>{" "}
                             <span className="text-blue-900">
-                              {new Date(formData.data_agendamento + "T00:00:00").toLocaleDateString("pt-BR")}
+                              {formatAgendamentoDate(formData.data_agendamento)}
                             </span>
                           </div>
                         )}

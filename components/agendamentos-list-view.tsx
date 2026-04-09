@@ -20,6 +20,7 @@ import {
   getVendedores,
   sendFollowUpWebhook,
   sendMessageWebhook,
+  formatAgendamentoDate,
   type Agendamento,
   type Vendedor,
   ESTAGIO_AGENDAMENTO_LABELS,
@@ -375,7 +376,7 @@ export function AgendamentosListView() {
       agendamento.telefone || "",
       agendamento.email || "",
       agendamento.modelo_veiculo || "",
-      agendamento.data_agendamento ? new Date(agendamento.data_agendamento).toLocaleDateString("pt-BR") : "",
+      agendamento.data_agendamento ? formatAgendamentoDate(agendamento.data_agendamento) : "",
       agendamento.hora_agendamento || "",
       agendamento.vendedor || "",
       ESTAGIO_AGENDAMENTO_LABELS[
@@ -632,7 +633,7 @@ export function AgendamentosListView() {
                         {agendamento.data_agendamento && (
                           <div className="flex items-center gap-1 text-sm">
                             <Calendar className="h-3 w-3" />
-                            {new Date(agendamento.data_agendamento).toLocaleDateString("pt-BR")}
+                            {formatAgendamentoDate(agendamento.data_agendamento)}
                             {agendamento.hora_agendamento && (
                               <>
                                 <Clock className="h-3 w-3 ml-2" />

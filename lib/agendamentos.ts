@@ -77,6 +77,18 @@ export const VALID_ESTAGIOS_AGENDAMENTO = [
   "insucesso",
 ]
 
+export function formatAgendamentoDate(date?: string) {
+  if (!date) return ""
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    const [year, month, day] = date.split("-")
+    return `${day}/${month}/${year}`
+  }
+
+  const parsedDate = new Date(date)
+  return Number.isNaN(parsedDate.getTime()) ? date : parsedDate.toLocaleDateString("pt-BR")
+}
+
 const ESTAGIO_AGENDAMENTO_NORMALIZATION: Record<string, string> = {
   agendar: "agendar",
   agendado: "agendado",
