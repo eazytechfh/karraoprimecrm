@@ -29,7 +29,7 @@ import { EditableEmailField } from "./editable-email-field"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { ProgressModal } from "./progress-modal"
 import { SendMessageModal } from "./send-message-modal"
-import { Filter, Search, ChevronDown, Trash2, Send, MessageSquare, Phone, Mail } from "lucide-react"
+import { Filter, Search, ChevronDown, Trash2, Send, MessageSquare, Phone, Mail, Move } from "lucide-react"
 
 interface LeadsListViewProps {
   leads: Lead[]
@@ -50,6 +50,7 @@ export function LeadsListView({ leads, onLeadsUpdate }: LeadsListViewProps) {
   const [actionMessage, setActionMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
 
   const [updatingStage, setUpdatingStage] = useState<number | null>(null)
+  const [bulkUpdatingStage, setBulkUpdatingStage] = useState<string | null>(null)
   const [generatingResumo, setGeneratingResumo] = useState(false)
   const [resumoMessage, setResumoMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
   const [showProgressModal, setShowProgressModal] = useState(false)
@@ -197,6 +198,62 @@ export function LeadsListView({ leads, onLeadsUpdate }: LeadsListViewProps) {
       setTimeout(() => setResumoMessage(null), 3000)
     } finally {
       setUpdatingStage(null)
+    }
+  }
+
+  const handleBulkStageChange = async (newStage: string) => {
+    if (selectedLeadIds.length === 0 || bulkUpdatingStage) return
+
+    const leadsToUpdate = filteredLeads.filter(
+      (lead) => selectedLeadIds.includes(lead.id) && lead.estagio_lead !== newStage,
+    )
+
+    if (leadsToUpdate.length === 0) {
+      setActionMessage({ type: "success", text: "Os leads selecionados já estão nesse estágio." })
+      setTimeout(() => setActionMessage(null), 4000)
+      return
+    }
+
+    setBulkUpdatingStage(newStage)
+
+    try {
+      const results = await Promise.all(leadsToUpdate.map((lead) => updateLeadStage(lead.id, newStage)))
+      const successCount = results.filter(Boolean).length
+
+      if (successCount > 0) {
+        const updatedAt = new Date().toISOString()
+
+        setFilteredLeads((prevLeads) =>
+          prevLeads.map((lead) =>
+            selectedLeadIds.includes(lead.id) && lead.estagio_lead !== newStage
+              ? { ...lead, estagio_lead: newStage, updated_at: updatedAt }
+              : lead,
+          ),
+        )
+
+        if (selectedLead && selectedLeadIds.includes(selectedLead.id)) {
+          setSelectedLead({ ...selectedLead, estagio_lead: newStage, updated_at: updatedAt })
+        }
+
+        onLeadsUpdate()
+      }
+
+      if (successCount === leadsToUpdate.length) {
+        setActionMessage({
+          type: "success",
+          text: `${successCount} lead(s) movido(s) para ${ESTAGIO_LABELS[newStage as keyof typeof ESTAGIO_LABELS]}.`,
+        })
+      } else {
+        setActionMessage({
+          type: "error",
+          text: `${successCount} de ${leadsToUpdate.length} lead(s) foram movidos. Tente novamente nos que faltaram.`,
+        })
+      }
+    } catch (error) {
+      setActionMessage({ type: "error", text: "Erro ao mover os leads selecionados. Tente novamente." })
+    } finally {
+      setBulkUpdatingStage(null)
+      setTimeout(() => setActionMessage(null), 5000)
     }
   }
 
@@ -446,28 +503,48 @@ export function LeadsListView({ leads, onLeadsUpdate }: LeadsListViewProps) {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium text-blue-800">{selectedLeadIds.length} lead(s) selecionado(s)</span>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="default" className="gap-2">
-                    Ações
-                    <ChevronDown className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={handleDeleteSelected} className="text-red-600">
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Excluir
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleSendFollowUp}>
-                    <Send className="h-4 w-4 mr-2" />
-                    Enviar Follow Up
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setShowMessageModal(true)}>
-                    <MessageSquare className="h-4 w-4 mr-2" />
-                    Enviar Mensagem
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <div className="flex items-center gap-2">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" className="gap-2 bg-transparent" disabled={!!bulkUpdatingStage}>
+                      <Move className="h-4 w-4" />
+                      {bulkUpdatingStage
+                        ? `Movendo para ${ESTAGIO_LABELS[bulkUpdatingStage as keyof typeof ESTAGIO_LABELS]}`
+                        : "Mover"}
+                      <ChevronDown className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    {Object.entries(ESTAGIO_LABELS).map(([key, label]) => (
+                      <DropdownMenuItem key={key} onClick={() => handleBulkStageChange(key)}>
+                        {label}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="default" className="gap-2" disabled={!!bulkUpdatingStage}>
+                      Ações
+                      <ChevronDown className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={handleDeleteSelected} className="text-red-600">
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Excluir
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleSendFollowUp}>
+                      <Send className="h-4 w-4 mr-2" />
+                      Enviar Follow Up
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setShowMessageModal(true)}>
+                      <MessageSquare className="h-4 w-4 mr-2" />
+                      Enviar Mensagem
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             </div>
           </CardContent>
         </Card>
