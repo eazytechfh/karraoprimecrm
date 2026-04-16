@@ -29,6 +29,7 @@ import { EditableEmailField } from "./editable-email-field"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { ProgressModal } from "./progress-modal"
 import { SendMessageModal } from "./send-message-modal"
+import { formatLeadHistoryDate, getLeadHistory, type LeadHistorico } from "@/lib/lead-history"
 import { Filter, Search, ChevronDown, Trash2, Send, MessageSquare, Phone, Mail, Move, User } from "lucide-react"
 
 interface LeadsListViewProps {
@@ -55,6 +56,8 @@ export function LeadsListView({ leads, onLeadsUpdate }: LeadsListViewProps) {
   const [generatingResumo, setGeneratingResumo] = useState(false)
   const [resumoMessage, setResumoMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
   const [showProgressModal, setShowProgressModal] = useState(false)
+  const [selectedLeadHistory, setSelectedLeadHistory] = useState<LeadHistorico[]>([])
+  const [loadingLeadHistory, setLoadingLeadHistory] = useState(false)
 
   useEffect(() => {
     filterLeads()
@@ -63,6 +66,22 @@ export function LeadsListView({ leads, onLeadsUpdate }: LeadsListViewProps) {
   useEffect(() => {
     setSelectedLeadIds([])
   }, [filteredLeads.length])
+
+  useEffect(() => {
+    const loadLeadHistoryData = async () => {
+      if (!selectedLead) {
+        setSelectedLeadHistory([])
+        return
+      }
+
+      setLoadingLeadHistory(true)
+      const history = await getLeadHistory(selectedLead.id_empresa, selectedLead.id)
+      setSelectedLeadHistory(history)
+      setLoadingLeadHistory(false)
+    }
+
+    loadLeadHistoryData()
+  }, [selectedLead])
 
   const filterLeads = () => {
     let filtered = [...leads]
@@ -822,6 +841,32 @@ export function LeadsListView({ leads, onLeadsUpdate }: LeadsListViewProps) {
                         onEmailUpdate={(newEmail) => handleEmailUpdate(selectedLead.id, newEmail)}
                       />
                     </div>
+                  </div>
+
+                  <div className="rounded-lg border bg-white p-4">
+                    <div className="mb-3 text-lg font-semibold text-gray-900">Historico do Lead</div>
+                    {loadingLeadHistory ? (
+                      <div className="space-y-2">
+                        {[1, 2].map((item) => (
+                          <div key={item} className="h-12 animate-pulse rounded bg-gray-100" />
+                        ))}
+                      </div>
+                    ) : selectedLeadHistory.length === 0 ? (
+                      <p className="text-sm italic text-gray-500">Nenhuma atualizacao registrada ainda.</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {selectedLeadHistory.slice(0, 6).map((item) => (
+                          <div key={item.id} className="rounded-lg bg-gray-50 p-3">
+                            <div className="text-sm text-gray-700">
+                              <span className="font-medium">Feito por: {item.usuario_nome}</span>
+                              {item.usuario_cargo && <span className="text-gray-400"> ({item.usuario_cargo})</span>} -{" "}
+                              {item.descricao}
+                            </div>
+                            <div className="mt-1 text-xs text-gray-400">{formatLeadHistoryDate(item.created_at)}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   {selectedLead.resumo_qualificacao && (

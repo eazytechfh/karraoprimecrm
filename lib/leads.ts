@@ -1,5 +1,6 @@
 import { createClient } from "@/utils/supabase/client"
 import { getCurrentUser } from "@/lib/auth"
+import { registerLeadHistory } from "@/lib/lead-history"
 
 export interface Lead {
   id: number
@@ -389,6 +390,17 @@ export async function updateLeadStage(leadId: number, newStage: string): Promise
         },
         newStage === "em_qualificacao",
       )
+    }
+
+    const currentUser = getCurrentUser()
+    if (currentUser) {
+      await registerLeadHistory({
+        id_lead: leadData.id,
+        id_empresa: leadData.id_empresa,
+        descricao: `moveu para etapa ${ESTAGIO_LABELS[newStage as keyof typeof ESTAGIO_LABELS] || newStage}`,
+        usuario_nome: currentUser.nome_usuario,
+        usuario_cargo: currentUser.cargo,
+      })
     }
 
     return true

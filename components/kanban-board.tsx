@@ -62,10 +62,25 @@ import {
   removeEtiquetaFromLead,
   type Etiqueta,
 } from "@/lib/etiquetas"
+import {
+  formatLeadHistoryDate,
+  getLeadHistory,
+  getLatestLeadHistoryMap,
+  registerLeadHistory,
+  type LeadHistorico,
+} from "@/lib/lead-history"
 import { Input } from "@/components/ui/input" // Added Input component
 import { toast } from "@/components/ui/use-toast" // Added toast for notifications
 
 const COLUNAS_KANBAN = ["pendente", "contato_iniciado", "nao_responde", "em_qualificacao", "vendedor", "resgate"]
+const COLUNA_TOP_BORDER_COLORS: Record<string, string> = {
+  pendente: "border-t-slate-400",
+  contato_iniciado: "border-t-cyan-500",
+  nao_responde: "border-t-rose-500",
+  em_qualificacao: "border-t-amber-400",
+  vendedor: "border-t-violet-500",
+  resgate: "border-t-indigo-500",
+}
 const MOTIVOS_LEAD = [
   "Nenhum motivo",
   "Desistência cliente",
@@ -111,6 +126,9 @@ export function KanbanBoard() {
   const [etiquetasDisponiveis, setEtiquetasDisponiveis] = useState<Etiqueta[]>([])
   const [leadEtiquetas, setLeadEtiquetas] = useState<Record<number, Etiqueta[]>>({})
   const [updatingEtiquetaId, setUpdatingEtiquetaId] = useState<string | null>(null)
+  const [leadLatestHistory, setLeadLatestHistory] = useState<Record<number, LeadHistorico>>({})
+  const [selectedLeadHistory, setSelectedLeadHistory] = useState<LeadHistorico[]>([])
+  const [loadingLeadHistory, setLoadingLeadHistory] = useState(false)
 
   const extractMotivo = (observacao?: string) => {
     if (!observacao) return ""
@@ -150,20 +168,41 @@ export function KanbanBoard() {
     setSelectedMotivo(extractMotivo(selectedLead?.observacao_vendedor))
   }, [selectedLead])
 
+  useEffect(() => {
+    const loadSelectedLeadHistory = async () => {
+      if (!selectedLead) {
+        setSelectedLeadHistory([])
+        return
+      }
+
+      setLoadingLeadHistory(true)
+      const historico = await getLeadHistory(selectedLead.id_empresa, selectedLead.id)
+      setSelectedLeadHistory(historico)
+      setLoadingLeadHistory(false)
+    }
+
+    loadSelectedLeadHistory()
+  }, [selectedLead])
+
   const loadLeads = async () => {
     const user = getCurrentUser()
     if (user) {
       const data = await getLeads(user.id_empresa)
       setLeads(data)
-      const [etiquetas, etiquetaMap] = await Promise.all([
+      const [etiquetas, etiquetaMap, latestHistoryMap] = await Promise.all([
         getEtiquetas(user.id_empresa),
         getLeadEtiquetasMap(
+          user.id_empresa,
+          data.map((lead) => lead.id),
+        ),
+        getLatestLeadHistoryMap(
           user.id_empresa,
           data.map((lead) => lead.id),
         ),
       ])
       setEtiquetasDisponiveis(etiquetas)
       setLeadEtiquetas(etiquetaMap)
+      setLeadLatestHistory(latestHistoryMap)
     }
     setLoading(false)
   }
@@ -342,6 +381,10 @@ export function KanbanBoard() {
           })
           setTimeout(() => setResumoMessage(null), 5000)
         }
+
+        if (leadData) {
+          await refreshLeadLatestHistory(leadData)
+        }
       }
     } catch (error) {
       console.error("Unexpected error moving lead:", error)
@@ -493,6 +536,49 @@ export function KanbanBoard() {
   }
 
   const getEtiquetasDoLead = (leadId: number) => leadEtiquetas[leadId] || []
+  const getLatestLeadHistoryEntry = (leadId: number) => leadLatestHistory[leadId]
+
+  const appendLeadHistoryEntry = (entry: LeadHistorico) => {
+    setLeadLatestHistory((prev) => ({
+      ...prev,
+      [entry.id_lead]: entry,
+    }))
+
+    if (selectedLead && selectedLead.id === entry.id_lead) {
+      setSelectedLeadHistory((prev) => [entry, ...prev])
+    }
+  }
+
+  const registerLeadAction = async (lead: Pick<Lead, "id" | "id_empresa">, descricao: string) => {
+    const user = getCurrentUser()
+    if (!user) return
+
+    const entry = await registerLeadHistory({
+      id_lead: lead.id,
+      id_empresa: lead.id_empresa,
+      descricao,
+      usuario_nome: user.nome_usuario,
+      usuario_cargo: user.cargo,
+    })
+
+    if (entry) {
+      appendLeadHistoryEntry(entry)
+    }
+  }
+
+  const refreshLeadLatestHistory = async (lead: Pick<Lead, "id" | "id_empresa">) => {
+    const historico = await getLeadHistory(lead.id_empresa, lead.id)
+    if (historico.length > 0) {
+      setLeadLatestHistory((prev) => ({
+        ...prev,
+        [lead.id]: historico[0],
+      }))
+
+      if (selectedLead && selectedLead.id === lead.id) {
+        setSelectedLeadHistory(historico)
+      }
+    }
+  }
 
   const origens = [...new Set(leads.map((lead) => lead.origem).filter(Boolean))]
   const sdrs = [...new Set(leads.map((lead) => lead.sdr_responsavel).filter(Boolean))]
@@ -563,6 +649,8 @@ export function KanbanBoard() {
       }
     })
 
+    await registerLeadAction(selectedLead, `${jaVinculada ? "removeu" : "adicionou"} etiqueta: ${etiqueta.nome}`)
+
     toast({
       title: jaVinculada ? "Etiqueta removida" : "Etiqueta adicionada",
       description: etiqueta.nome,
@@ -618,6 +706,7 @@ export function KanbanBoard() {
       setSelectedLead({ ...selectedLead, ...editedLead })
       setIsEditMode(false)
       setEditedLead(null) // Clear editedLead after saving
+      await registerLeadAction(editedLead, "editou os dados do lead")
 
       toast({
         title: "Sucesso",
@@ -665,6 +754,11 @@ export function KanbanBoard() {
     if (editedLead && editedLead.id === selectedLead.id) {
       setEditedLead({ ...editedLead, observacao_vendedor: novaObservacao })
     }
+
+    await registerLeadAction(
+      selectedLead,
+      motivo === "Nenhum motivo" ? "removeu o motivo do lead" : `adicionou motivo: ${motivo}`,
+    )
 
     toast({
       title: "Motivo salvo",
@@ -754,6 +848,7 @@ export function KanbanBoard() {
         ),
       )
       setSelectedMotivo(motivo)
+      await registerLeadAction(selectedLead, `finalizou e adicionou motivo: ${motivo}`)
       setSelectedLead(null)
       setShowFinalizarModal(false)
 
@@ -822,6 +917,11 @@ export function KanbanBoard() {
         if (selectedLead && selectedLead.id === leadToTransfer.id) {
           setSelectedLead({ ...selectedLead, vendedor: selectedVendedor, estagio_lead: "vendedor" })
         }
+
+        await registerLeadAction(
+          leadToTransfer,
+          `transferiu para ${selectedVendedor} e moveu para etapa ${ESTAGIO_LABELS.vendedor}`,
+        )
 
         setShowTransferDialog(false)
         setShowSuccessMessage(true)
@@ -1122,7 +1222,7 @@ export function KanbanBoard() {
                   <Droppable key={stage} droppableId={stage}>
                     {(provided, snapshot) => (
                       <Card
-                        className={`w-80 h-[70vh] min-h-[500px] flex-shrink-0 flex flex-col transition-all duration-200 ${
+                        className={`w-80 h-[70vh] min-h-[500px] flex-shrink-0 flex flex-col border-t-4 ${COLUNA_TOP_BORDER_COLORS[stage] || "border-t-slate-300"} transition-all duration-200 ${
                           snapshot.isDraggingOver
                             ? "bg-gradient-to-b from-blue-50 to-blue-100 border-blue-300 shadow-lg transform scale-105"
                             : "hover:shadow-md"
@@ -1240,6 +1340,21 @@ export function KanbanBoard() {
                                           <span className="text-xs text-gray-500 truncate ml-2">{lead.vendedor}</span>
                                         )}
                                       </div>
+                                      {getLatestLeadHistoryEntry(lead.id) && (
+                                        <div className="rounded-md bg-gray-50 px-2 py-1.5 text-[11px] leading-relaxed text-gray-600">
+                                          <span className="font-medium">
+                                            Feito por: {getLatestLeadHistoryEntry(lead.id)?.usuario_nome}
+                                          </span>
+                                          {getLatestLeadHistoryEntry(lead.id)?.usuario_cargo && (
+                                            <span className="text-gray-400">
+                                              {" "}
+                                              ({getLatestLeadHistoryEntry(lead.id)?.usuario_cargo})
+                                            </span>
+                                          )}{" "}
+                                          - {getLatestLeadHistoryEntry(lead.id)?.descricao}{" "}
+                                          {formatLeadHistoryDate(getLatestLeadHistoryEntry(lead.id)!.created_at)}
+                                        </div>
+                                      )}
                                     </div>
                                   </CardContent>
                                 </Card>
@@ -1442,6 +1557,21 @@ export function KanbanBoard() {
                             ))}
                           </div>
                         )}
+                        {getLatestLeadHistoryEntry(selectedLead.id) && (
+                          <div className="mt-3 rounded-md bg-gray-50 px-3 py-2 text-sm text-gray-600">
+                            <span className="font-medium">
+                              Feito por: {getLatestLeadHistoryEntry(selectedLead.id)?.usuario_nome}
+                            </span>
+                            {getLatestLeadHistoryEntry(selectedLead.id)?.usuario_cargo && (
+                              <span className="text-gray-400">
+                                {" "}
+                                ({getLatestLeadHistoryEntry(selectedLead.id)?.usuario_cargo})
+                              </span>
+                            )}{" "}
+                            - {getLatestLeadHistoryEntry(selectedLead.id)?.descricao}{" "}
+                            {formatLeadHistoryDate(getLatestLeadHistoryEntry(selectedLead.id)!.created_at)}
+                          </div>
+                        )}
                       </div>
                       <Button
                         onClick={() => handleTransferClick(selectedLead)}
@@ -1594,6 +1724,37 @@ export function KanbanBoard() {
                             currentEmail={selectedLead.email || ""}
                             onEmailUpdate={(newEmail) => handleEmailUpdate(selectedLead.id, newEmail)}
                           />
+                        </div>
+                      </div>
+
+                      <div>
+                        <h4 className="mb-3 flex items-center gap-2 text-lg font-semibold">
+                          <Calendar className="h-5 w-5 text-slate-500" />
+                          Historico do Lead
+                        </h4>
+                        <div className="rounded-lg border bg-white p-4">
+                          {loadingLeadHistory ? (
+                            <div className="space-y-2">
+                              {[1, 2].map((item) => (
+                                <div key={item} className="h-12 animate-pulse rounded bg-gray-100" />
+                              ))}
+                            </div>
+                          ) : selectedLeadHistory.length === 0 ? (
+                            <p className="text-sm italic text-gray-500">Nenhuma atualizacao registrada ainda.</p>
+                          ) : (
+                            <div className="space-y-3">
+                              {selectedLeadHistory.slice(0, 6).map((item) => (
+                                <div key={item.id} className="rounded-lg bg-gray-50 p-3">
+                                  <div className="text-sm text-gray-700">
+                                    <span className="font-medium">Feito por: {item.usuario_nome}</span>
+                                    {item.usuario_cargo && <span className="text-gray-400"> ({item.usuario_cargo})</span>} -{" "}
+                                    {item.descricao}
+                                  </div>
+                                  <div className="mt-1 text-xs text-gray-400">{formatLeadHistoryDate(item.created_at)}</div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </div>
 
