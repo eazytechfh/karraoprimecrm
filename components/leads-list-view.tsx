@@ -29,7 +29,7 @@ import { EditableEmailField } from "./editable-email-field"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { ProgressModal } from "./progress-modal"
 import { SendMessageModal } from "./send-message-modal"
-import { Filter, Search, ChevronDown, Trash2, Send, MessageSquare, Phone, Mail, Move } from "lucide-react"
+import { Filter, Search, ChevronDown, Trash2, Send, MessageSquare, Phone, Mail, Move, User } from "lucide-react"
 
 interface LeadsListViewProps {
   leads: Lead[]
@@ -42,6 +42,7 @@ export function LeadsListView({ leads, onLeadsUpdate }: LeadsListViewProps) {
   const [searchTerm, setSearchTerm] = useState("")
   const [filterOrigem, setFilterOrigem] = useState("")
   const [filterEstagio, setFilterEstagio] = useState("")
+  const [filterSdr, setFilterSdr] = useState("")
   const [filterDataInicio, setFilterDataInicio] = useState("")
   const [filterDataFim, setFilterDataFim] = useState("")
   const [filterVeiculo, setFilterVeiculo] = useState("")
@@ -57,7 +58,7 @@ export function LeadsListView({ leads, onLeadsUpdate }: LeadsListViewProps) {
 
   useEffect(() => {
     filterLeads()
-  }, [leads, searchTerm, filterOrigem, filterEstagio, filterDataInicio, filterDataFim, filterVeiculo])
+  }, [leads, searchTerm, filterOrigem, filterEstagio, filterSdr, filterDataInicio, filterDataFim, filterVeiculo])
 
   useEffect(() => {
     setSelectedLeadIds([])
@@ -71,7 +72,8 @@ export function LeadsListView({ leads, onLeadsUpdate }: LeadsListViewProps) {
         (lead) =>
           lead.nome_lead.toLowerCase().includes(searchTerm.toLowerCase()) ||
           lead.telefone?.includes(searchTerm) ||
-          lead.vendedor?.toLowerCase().includes(searchTerm.toLowerCase()),
+          lead.vendedor?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          lead.sdr_responsavel?.toLowerCase().includes(searchTerm.toLowerCase()),
       )
     }
 
@@ -81,6 +83,10 @@ export function LeadsListView({ leads, onLeadsUpdate }: LeadsListViewProps) {
 
     if (filterEstagio && filterEstagio !== "all") {
       filtered = filtered.filter((lead) => lead.estagio_lead === filterEstagio)
+    }
+
+    if (filterSdr && filterSdr !== "all") {
+      filtered = filtered.filter((lead) => lead.sdr_responsavel === filterSdr)
     }
 
     if (filterDataInicio) {
@@ -347,6 +353,7 @@ export function LeadsListView({ leads, onLeadsUpdate }: LeadsListViewProps) {
       "Veículo de Interesse",
       "Estágio",
       "Vendedor",
+      "SDR",
       "Data Entrada",
       "Observações",
     ]
@@ -359,6 +366,7 @@ export function LeadsListView({ leads, onLeadsUpdate }: LeadsListViewProps) {
       lead.veiculo_interesse || "",
       ESTAGIO_LABELS[lead.estagio_lead as keyof typeof ESTAGIO_LABELS] || lead.estagio_lead || "",
       lead.vendedor || "",
+      lead.sdr_responsavel || "",
       lead.data_entrada ? new Date(lead.data_entrada).toLocaleDateString("pt-BR") : "",
       lead.observacao_vendedor || "",
     ])
@@ -381,6 +389,7 @@ export function LeadsListView({ leads, onLeadsUpdate }: LeadsListViewProps) {
 
   const origens = [...new Set(leads.map((lead) => lead.origem).filter(Boolean))]
   const veiculos = [...new Set(leads.map((lead) => lead.veiculo_interesse).filter(Boolean))]
+  const sdrs = [...new Set(leads.map((lead) => lead.sdr_responsavel).filter(Boolean))]
 
   return (
     <div className="space-y-4">
@@ -421,7 +430,7 @@ export function LeadsListView({ leads, onLeadsUpdate }: LeadsListViewProps) {
             <div className="relative">
               <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
               <Input
-                placeholder="Buscar por nome, telefone ou vendedor..."
+                placeholder="Buscar por nome, telefone, vendedor ou SDR..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
@@ -449,6 +458,19 @@ export function LeadsListView({ leads, onLeadsUpdate }: LeadsListViewProps) {
                 {Object.entries(ESTAGIO_LABELS).map(([key, label]) => (
                   <SelectItem key={key} value={key}>
                     {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={filterSdr} onValueChange={setFilterSdr}>
+              <SelectTrigger>
+                <SelectValue placeholder="Filtrar por SDR" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os SDRs</SelectItem>
+                {sdrs.map((sdr) => (
+                  <SelectItem key={sdr} value={sdr!}>
+                    {sdr}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -586,6 +608,7 @@ export function LeadsListView({ leads, onLeadsUpdate }: LeadsListViewProps) {
                   <TableHead className="hidden md:table-cell">Valor</TableHead>
                   <TableHead className="hidden md:table-cell">Telefone</TableHead>
                   <TableHead className="hidden lg:table-cell">Origem</TableHead>
+                  <TableHead className="hidden lg:table-cell">SDR</TableHead>
                   <TableHead className="hidden lg:table-cell">Vendedor</TableHead>
                   <TableHead className="hidden xl:table-cell">Veículo</TableHead>
                   <TableHead>Estágio</TableHead>
@@ -612,6 +635,12 @@ export function LeadsListView({ leads, onLeadsUpdate }: LeadsListViewProps) {
                               {lead.telefone}
                             </span>
                           )}
+                          {lead.sdr_responsavel && (
+                            <span className="flex items-center gap-1 mt-1">
+                              <User className="h-3 w-3" />
+                              SDR: {lead.sdr_responsavel}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </TableCell>
@@ -633,6 +662,7 @@ export function LeadsListView({ leads, onLeadsUpdate }: LeadsListViewProps) {
                         </Badge>
                       )}
                     </TableCell>
+                    <TableCell className="hidden lg:table-cell">{lead.sdr_responsavel}</TableCell>
                     <TableCell className="hidden lg:table-cell">{lead.vendedor}</TableCell>
                     <TableCell className="hidden xl:table-cell">{lead.veiculo_interesse}</TableCell>
                     <TableCell>

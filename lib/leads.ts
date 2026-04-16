@@ -150,6 +150,68 @@ async function fetchAllLeadsRows(
   return allLeads
 }
 
+async function ensureAgendamentoForLead(
+  lead: Pick<
+    Lead,
+    "id" | "id_empresa" | "nome_lead" | "telefone" | "email" | "veiculo_interesse" | "vendedor" | "sdr_responsavel"
+  >,
+  forceStage = false,
+) {
+  const supabase = createClient()
+
+  const { data: existingAgendamento, error: existingError } = await supabase
+    .from("AGENDAMENTOS")
+    .select("id, vendedor, sdr_responsavel, estagio_agendamento")
+    .eq("id_lead", lead.id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (existingError) {
+    console.error("Error checking existing agendamento:", existingError)
+    return
+  }
+
+  const now = new Date().toISOString()
+
+  if (existingAgendamento) {
+    const updates: Record<string, any> = {
+      vendedor: lead.vendedor || null,
+      sdr_responsavel: lead.sdr_responsavel || null,
+      updated_at: now,
+    }
+
+    if (forceStage) {
+      updates.estagio_agendamento = "agendar"
+    }
+
+    const { error: updateError } = await supabase.from("AGENDAMENTOS").update(updates).eq("id", existingAgendamento.id)
+
+    if (updateError) {
+      console.error("Error updating agendamento:", updateError)
+    }
+    return
+  }
+
+  const { error: insertError } = await supabase.from("AGENDAMENTOS").insert({
+    id_empresa: lead.id_empresa,
+    id_lead: lead.id,
+    nome_lead: lead.nome_lead || "Lead sem nome",
+    telefone: lead.telefone || null,
+    email: lead.email || null,
+    modelo_veiculo: lead.veiculo_interesse || null,
+    vendedor: lead.vendedor || null,
+    sdr_responsavel: lead.sdr_responsavel || null,
+    estagio_agendamento: "agendar",
+    created_at: now,
+    updated_at: now,
+  })
+
+  if (insertError) {
+    console.error("Error creating agendamento for lead:", insertError)
+  }
+}
+
 export async function getAccurateLeadStats(idEmpresa: number) {
   try {
     const leads = await fetchAllLeadStatsRows(idEmpresa)
@@ -313,7 +375,21 @@ export async function updateLeadStage(leadId: number, newStage: string): Promise
       updatedLead: data[0],
     })
 
-    // O trigger assign_sdr_from_vendedor() cuida de criar o agendamento com o SDR correto
+    if (newStage === "em_qualificacao" || newStage === "vendedor") {
+      await ensureAgendamentoForLead(
+        {
+          id: leadData.id,
+          id_empresa: leadData.id_empresa,
+          nome_lead: leadData.nome_lead,
+          telefone: leadData.telefone,
+          email: leadData.email,
+          veiculo_interesse: leadData.veiculo_interesse,
+          vendedor: leadData.vendedor,
+          sdr_responsavel: sdrResponsavel || leadData.sdr_responsavel,
+        },
+        newStage === "em_qualificacao",
+      )
+    }
 
     return true
   } catch (error) {

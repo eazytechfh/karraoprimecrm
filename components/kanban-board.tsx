@@ -85,6 +85,7 @@ export function KanbanBoard() {
   const [searchTerm, setSearchTerm] = useState("")
   const [filterOrigem, setFilterOrigem] = useState("")
   const [filterEstagio, setFilterEstagio] = useState("")
+  const [filterSdr, setFilterSdr] = useState("")
   const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban")
   const [generatingResumo, setGeneratingResumo] = useState(false)
   const [resumoMessage, setResumoMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
@@ -143,7 +144,7 @@ export function KanbanBoard() {
 
   useEffect(() => {
     filterLeads()
-  }, [leads, searchTerm, filterOrigem, filterEstagio])
+  }, [leads, searchTerm, filterOrigem, filterEstagio, filterSdr])
 
   useEffect(() => {
     setSelectedMotivo(extractMotivo(selectedLead?.observacao_vendedor))
@@ -167,11 +168,13 @@ export function KanbanBoard() {
     setLoading(false)
   }
 
-  const ensureAgendamentoForLead = async (lead: Partial<Lead> & { id: number }, vendedorOverride?: string) => {
+  const ensureAgendamentoForLead = async (
+    lead: Partial<Lead> & { id: number },
+    vendedorOverride?: string,
+    forceStage = false,
+  ) => {
     const supabase = createClient()
     const vendedor = vendedorOverride ?? lead.vendedor
-
-    if (!vendedor) return
 
     const { data: existingAgendamento, error: existingError } = await supabase
       .from("AGENDAMENTOS")
@@ -190,7 +193,9 @@ export function KanbanBoard() {
       const { error: updateError } = await supabase
         .from("AGENDAMENTOS")
         .update({
-          vendedor,
+          vendedor: vendedor || null,
+          sdr_responsavel: lead.sdr_responsavel || null,
+          ...(forceStage ? { estagio_agendamento: "agendar" } : {}),
           updated_at: new Date().toISOString(),
         })
         .eq("id", existingAgendamento.id)
@@ -209,7 +214,7 @@ export function KanbanBoard() {
       telefone: lead.telefone || null,
       email: lead.email || null,
       modelo_veiculo: lead.veiculo_interesse || null,
-      vendedor,
+      vendedor: vendedor || null,
       sdr_responsavel: lead.sdr_responsavel || null,
       estagio_agendamento: "agendar",
       created_at: new Date().toISOString(),
@@ -229,7 +234,8 @@ export function KanbanBoard() {
         (lead) =>
           lead.nome_lead.toLowerCase().includes(searchTerm.toLowerCase()) ||
           lead.telefone?.includes(searchTerm) ||
-          lead.vendedor?.toLowerCase().includes(searchTerm.toLowerCase()),
+          lead.vendedor?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          lead.sdr_responsavel?.toLowerCase().includes(searchTerm.toLowerCase()),
       )
     }
 
@@ -239,6 +245,10 @@ export function KanbanBoard() {
 
     if (filterEstagio && filterEstagio !== "all") {
       filtered = filtered.filter((lead) => lead.estagio_lead === filterEstagio)
+    }
+
+    if (filterSdr && filterSdr !== "all") {
+      filtered = filtered.filter((lead) => lead.sdr_responsavel === filterSdr)
     }
 
     setFilteredLeads(filtered)
@@ -317,11 +327,18 @@ export function KanbanBoard() {
       } else {
         console.log("Lead moved successfully")
 
-        if (newStage === "vendedor" && leadData) {
-          await ensureAgendamentoForLead(leadData)
+        if ((newStage === "vendedor" || newStage === "em_qualificacao") && leadData) {
+          await ensureAgendamentoForLead(
+            leadData,
+            newStage === "vendedor" ? leadData.vendedor : undefined,
+            newStage === "em_qualificacao",
+          )
           setResumoMessage({
             type: "success",
-            text: "Lead movido para Vendedor com sucesso! Um novo agendamento foi criado na aba Agendamentos.",
+            text:
+              newStage === "vendedor"
+                ? "Lead movido para Vendedor com sucesso! Um novo agendamento foi criado na aba Agendamentos."
+                : "Lead movido para Em Qualificacao com sucesso! Ele ja aparece em Agendamentos na etapa Agendar.",
           })
           setTimeout(() => setResumoMessage(null), 5000)
         }
@@ -478,6 +495,7 @@ export function KanbanBoard() {
   const getEtiquetasDoLead = (leadId: number) => leadEtiquetas[leadId] || []
 
   const origens = [...new Set(leads.map((lead) => lead.origem).filter(Boolean))]
+  const sdrs = [...new Set(leads.map((lead) => lead.sdr_responsavel).filter(Boolean))]
 
   const handleLeadsUpdate = () => {
     loadLeads()
@@ -1052,11 +1070,11 @@ export function KanbanBoard() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
                 <div className="relative">
                   <Phone className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                   <input
-                    placeholder="Buscar por nome, telefone ou vendedor..."
+                    placeholder="Buscar por nome, telefone, vendedor ou SDR..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="pl-10"
@@ -1078,6 +1096,16 @@ export function KanbanBoard() {
                     {Object.entries(ESTAGIO_LABELS).map(([key, label]) => (
                       <option key={key} value={key}>
                         {label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <select value={filterSdr} onChange={(e) => setFilterSdr(e.target.value)}>
+                    <option value="all">Todos os SDRs</option>
+                    {sdrs.map((sdr) => (
+                      <option key={sdr} value={sdr!}>
+                        {sdr}
                       </option>
                     ))}
                   </select>
@@ -1194,6 +1222,12 @@ export function KanbanBoard() {
                                         <p className="text-xs text-gray-600 flex items-center gap-1 truncate">
                                           <Car className="h-3 w-3 flex-shrink-0" />
                                           <span className="truncate">{lead.veiculo_interesse}</span>
+                                        </p>
+                                      )}
+                                      {lead.sdr_responsavel && (
+                                        <p className="text-xs text-gray-600 flex items-center gap-1 truncate">
+                                          <User className="h-3 w-3 flex-shrink-0" />
+                                          <span className="truncate">SDR: {lead.sdr_responsavel}</span>
                                         </p>
                                       )}
                                       <div className="flex justify-between items-center">
