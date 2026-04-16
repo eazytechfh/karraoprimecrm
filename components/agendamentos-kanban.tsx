@@ -1300,7 +1300,7 @@ export function AgendamentosKanban() {
 
             return (
               <DroppableColumn key={coluna} stage={coluna}>
-                <Card className="h-full">
+                <Card className="flex h-[calc(100vh-16rem)] min-h-[540px] min-w-0 flex-col">
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-base font-semibold">
@@ -1318,7 +1318,7 @@ export function AgendamentosKanban() {
                       </div>
                     </div>
                   </CardHeader>
-                  <CardContent className="space-y-2">
+                  <CardContent className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-2">
                     {agendamentosColuna.length === 0 ? (
                       <p className="text-sm text-muted-foreground text-center py-4">Nenhum agendamento</p>
                     ) : (

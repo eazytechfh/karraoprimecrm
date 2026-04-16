@@ -1,6 +1,7 @@
 import { createClient } from "@/utils/supabase/client"
 import { getCurrentUser } from "@/lib/auth"
 import { registerLeadHistory } from "@/lib/lead-history"
+import { normalizeAgendamentoStage } from "@/lib/agendamentos"
 
 export interface Lead {
   id: number
@@ -151,6 +152,42 @@ async function fetchAllLeadsRows(
   return allLeads
 }
 
+async function fetchLatestAgendamentoStageByLead(
+  idEmpresa: number,
+  leadIds: number[],
+): Promise<Record<number, string>> {
+  if (leadIds.length === 0) {
+    return {}
+  }
+
+  const supabase = createClient()
+  const uniqueLeadIds = [...new Set(leadIds)]
+  const latestStageByLead: Record<number, string> = {}
+
+  for (let index = 0; index < uniqueLeadIds.length; index += DASHBOARD_BATCH_SIZE) {
+    const batch = uniqueLeadIds.slice(index, index + DASHBOARD_BATCH_SIZE)
+    const { data, error } = await supabase
+      .from("AGENDAMENTOS")
+      .select("id_lead, estagio_agendamento, updated_at, created_at")
+      .eq("id_empresa", idEmpresa)
+      .in("id_lead", batch)
+      .order("updated_at", { ascending: false })
+      .order("created_at", { ascending: false })
+
+    if (error) {
+      throw error
+    }
+
+    for (const agendamento of data || []) {
+      if (!latestStageByLead[agendamento.id_lead]) {
+        latestStageByLead[agendamento.id_lead] = agendamento.estagio_agendamento
+      }
+    }
+  }
+
+  return latestStageByLead
+}
+
 async function ensureAgendamentoForLead(
   lead: Pick<
     Lead,
@@ -289,11 +326,23 @@ export async function getLeads(idEmpresa: number): Promise<Lead[]> {
 
   try {
     const data = await fetchAllLeadsRows(idEmpresa, user)
+    const latestAgendamentoStageByLead = await fetchLatestAgendamentoStageByLead(
+      idEmpresa,
+      data.filter((lead) => normalizeLeadStage(lead.estagio_lead) === "vendedor").map((lead) => lead.id),
+    )
 
-    return data.map((lead) => ({
+    return data
+      .map((lead) => ({
       ...lead,
       estagio_lead: normalizeLeadStage(lead.estagio_lead),
-    }))
+      }))
+      .filter((lead) => {
+        if (lead.estagio_lead !== "vendedor") {
+          return true
+        }
+
+        return normalizeAgendamentoStage(latestAgendamentoStageByLead[lead.id]) !== "insucesso"
+      })
   } catch (error) {
     console.error("Error fetching leads:", error)
     return []
