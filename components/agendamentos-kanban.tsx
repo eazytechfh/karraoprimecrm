@@ -69,6 +69,15 @@ const COLUNAS_KANBAN_AGENDAMENTOS = [
   "sucesso",
   "insucesso",
 ]
+const COLUNA_TOP_BORDER_COLORS_AGENDAMENTOS: Record<string, string> = {
+  agendar: "border-t-slate-400",
+  agendado: "border-t-blue-500",
+  nao_compareceu: "border-t-rose-500",
+  reagendado: "border-t-amber-500",
+  visita_realizada: "border-t-emerald-500",
+  sucesso: "border-t-green-600",
+  insucesso: "border-t-red-500",
+}
 const CHECKBOX_FLAGS_PREFIX = "__flags__:"
 
 function parseCheckboxFlagsFromObservacoes(observacoes?: string) {
@@ -1300,7 +1309,11 @@ export function AgendamentosKanban() {
 
             return (
               <DroppableColumn key={coluna} stage={coluna}>
-                <Card className="flex h-[calc(100vh-16rem)] min-h-[540px] min-w-0 flex-col">
+                <Card
+                  className={`flex h-[calc(100vh-16rem)] min-h-[540px] min-w-0 flex-col border-t-4 ${
+                    COLUNA_TOP_BORDER_COLORS_AGENDAMENTOS[coluna] || "border-t-slate-300"
+                  }`}
+                >
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-base font-semibold">
