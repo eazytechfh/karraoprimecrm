@@ -102,6 +102,12 @@ export default function Configuracoes() {
         title: "Etiqueta criada",
         description: created.nome,
       })
+    } else {
+      toast({
+        title: "Erro ao criar etiqueta",
+        description: "Nao foi possivel salvar a etiqueta.",
+        variant: "destructive",
+      })
     }
 
     setSavingEtiqueta(false)
@@ -117,6 +123,12 @@ export default function Configuracoes() {
       setEtiquetas((prev) => prev.filter((etiqueta) => etiqueta.id !== etiquetaId))
       toast({
         title: "Etiqueta removida",
+      })
+    } else {
+      toast({
+        title: "Erro ao remover etiqueta",
+        description: "Nao foi possivel excluir a etiqueta.",
+        variant: "destructive",
       })
     }
 

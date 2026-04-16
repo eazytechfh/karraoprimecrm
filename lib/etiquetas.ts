@@ -99,9 +99,7 @@ export async function getEtiquetas(idEmpresa: number): Promise<Etiqueta[]> {
     return data || []
   }
 
-  if (!isMissingTableError(error)) {
-    console.error("Erro ao buscar etiquetas:", error)
-  }
+  console.error("Erro ao buscar etiquetas no Supabase, usando armazenamento local:", error)
 
   return sortEtiquetas(readStoredEtiquetas().filter((etiqueta) => etiqueta.id_empresa === idEmpresa))
 }
@@ -126,12 +124,17 @@ export async function createEtiqueta(input: {
     return data
   }
 
-  if (!isMissingTableError(error)) {
-    console.error("Erro ao criar etiqueta:", error)
-    return null
-  }
+  console.error("Erro ao criar etiqueta no Supabase, usando armazenamento local:", error)
 
   const etiquetas = readStoredEtiquetas()
+  const existente = etiquetas.find(
+    (etiqueta) => etiqueta.id_empresa === input.id_empresa && etiqueta.nome.trim().toLowerCase() === payload.nome.toLowerCase(),
+  )
+
+  if (existente) {
+    return existente
+  }
+
   const etiqueta: Etiqueta = {
     id: crypto.randomUUID(),
     ...payload,
@@ -150,10 +153,7 @@ export async function deleteEtiqueta(idEmpresa: number, etiquetaId: string): Pro
     return true
   }
 
-  if (!isMissingTableError(error)) {
-    console.error("Erro ao excluir etiqueta:", error)
-    return false
-  }
+  console.error("Erro ao excluir etiqueta no Supabase, usando armazenamento local:", error)
 
   writeStoredEtiquetas(
     readStoredEtiquetas().filter((etiqueta) => !(etiqueta.id_empresa === idEmpresa && etiqueta.id === etiquetaId)),
@@ -180,12 +180,12 @@ export async function getLeadEtiquetasMap(idEmpresa: number, leadIds: number[]):
     return buildLeadEtiquetaMap(etiquetasData || [], (relacoesData || []) as LeadEtiqueta[])
   }
 
-  if (!isMissingTableError(etiquetasError) && etiquetasError) {
-    console.error("Erro ao buscar etiquetas dos leads:", etiquetasError)
+  if (etiquetasError) {
+    console.error("Erro ao buscar etiquetas dos leads no Supabase, usando armazenamento local:", etiquetasError)
   }
 
-  if (!isMissingTableError(relacoesError) && relacoesError) {
-    console.error("Erro ao buscar relacoes de etiquetas:", relacoesError)
+  if (relacoesError) {
+    console.error("Erro ao buscar relacoes de etiquetas no Supabase, usando armazenamento local:", relacoesError)
   }
 
   const etiquetas = readStoredEtiquetas().filter((etiqueta) => etiqueta.id_empresa === idEmpresa)
@@ -221,13 +221,9 @@ export async function assignEtiquetaToLead(idEmpresa: number, leadId: number, et
       return true
     }
 
-    if (!isMissingTableError(insertError)) {
-      console.error("Erro ao vincular etiqueta ao lead:", insertError)
-      return false
-    }
-  } else if (!isMissingTableError(consultaError)) {
-    console.error("Erro ao consultar etiqueta do lead:", consultaError)
-    return false
+    console.error("Erro ao vincular etiqueta ao lead no Supabase, usando armazenamento local:", insertError)
+  } else if (consultaError) {
+    console.error("Erro ao consultar etiqueta do lead no Supabase, usando armazenamento local:", consultaError)
   }
 
   const relacoes = readStoredLeadEtiquetas()
@@ -264,10 +260,7 @@ export async function removeEtiquetaFromLead(idEmpresa: number, leadId: number, 
     return true
   }
 
-  if (!isMissingTableError(error)) {
-    console.error("Erro ao remover etiqueta do lead:", error)
-    return false
-  }
+  console.error("Erro ao remover etiqueta do lead no Supabase, usando armazenamento local:", error)
 
   writeStoredLeadEtiquetas(
     readStoredLeadEtiquetas().filter(
