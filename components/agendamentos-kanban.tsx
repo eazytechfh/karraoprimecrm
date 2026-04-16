@@ -17,6 +17,7 @@ import {
   getAgendamentos,
   deleteAgendamento,
   getVendedores,
+  getSdrs,
   formatAgendamentoDate,
   type Agendamento,
   type Vendedor,
@@ -40,6 +41,7 @@ import { getCurrentUser, canEditCards, type User } from "@/lib/auth"
 import {
   Search,
   Filter,
+  Download,
   Phone,
   Calendar,
   Clock,
@@ -224,7 +226,14 @@ export function AgendamentosKanban() {
   const [loading, setLoading] = useState(true)
   const [selectedAgendamento, setSelectedAgendamento] = useState<Agendamento | null>(null)
   const [vendedores, setVendedores] = useState<Vendedor[]>([])
+  const [sdrs, setSdrs] = useState<Vendedor[]>([])
   const [searchTerm, setSearchTerm] = useState("")
+  const [filterEstagio, setFilterEstagio] = useState("all")
+  const [filterRealizouVisita, setFilterRealizouVisita] = useState("all")
+  const [filterGanho, setFilterGanho] = useState("all")
+  const [filterSdr, setFilterSdr] = useState("all")
+  const [filterDataAgendamentoInicio, setFilterDataAgendamentoInicio] = useState("")
+  const [filterDataAgendamentoFim, setFilterDataAgendamentoFim] = useState("")
   const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
   const [movingAgendamento, setMovingAgendamento] = useState<number | null>(null)
   const [deletingAgendamento, setDeletingAgendamento] = useState<number | null>(null)
@@ -278,12 +287,14 @@ export function AgendamentosKanban() {
     const user = getCurrentUser()
     setCurrentUser(user)
     if (user) {
-      const [agendamentosData, vendedoresData] = await Promise.all([
+      const [agendamentosData, vendedoresData, sdrsData] = await Promise.all([
         getAgendamentos(user.id_empresa),
         getVendedores(user.id_empresa),
+        getSdrs(user.id_empresa),
       ])
       setAgendamentos(agendamentosData)
       setVendedores(vendedoresData)
+      setSdrs(sdrsData)
     }
     setLoading(false)
   }
@@ -298,6 +309,42 @@ export function AgendamentosKanban() {
           a.telefone?.includes(searchTerm) ||
           a.vendedor?.toLowerCase().includes(searchTerm.toLowerCase()),
       )
+    }
+
+    if (filterEstagio !== "all") {
+      filtered = filtered.filter((a) => normalizeAgendamentoStage(a.estagio_agendamento) === filterEstagio)
+    }
+
+    if (filterRealizouVisita !== "all") {
+      filtered = filtered.filter((a) => {
+        const realizouVisita =
+          normalizeAgendamentoStage(a.estagio_agendamento) === "visita_realizada" ||
+          parseCheckboxFlagsFromObservacoes(a.observacoes).realizouVisita
+
+        return filterRealizouVisita === "sim" ? realizouVisita : !realizouVisita
+      })
+    }
+
+    if (filterGanho !== "all") {
+      filtered = filtered.filter((a) => {
+        const ganhou =
+          normalizeAgendamentoStage(a.estagio_agendamento) === "sucesso" ||
+          parseCheckboxFlagsFromObservacoes(a.observacoes).ganho
+
+        return filterGanho === "sim" ? ganhou : !ganhou
+      })
+    }
+
+    if (filterSdr !== "all") {
+      filtered = filtered.filter((a) => a.sdr_responsavel === filterSdr)
+    }
+
+    if (filterDataAgendamentoInicio) {
+      filtered = filtered.filter((a) => a.data_agendamento && a.data_agendamento >= filterDataAgendamentoInicio)
+    }
+
+    if (filterDataAgendamentoFim) {
+      filtered = filtered.filter((a) => a.data_agendamento && a.data_agendamento <= filterDataAgendamentoFim)
     }
 
     setFilteredAgendamentos(filtered)
@@ -823,6 +870,58 @@ export function AgendamentosKanban() {
     })
   }
 
+  const handleExportCSV = () => {
+    const headers = [
+      "Cliente",
+      "Telefone",
+      "Vendedor",
+      "SDR Responsavel",
+      "Data Agendamento",
+      "Hora Agendamento",
+      "Realizou Visita",
+      "Ganho",
+      "Estagio",
+      "Ultima Atualizacao",
+    ]
+
+    const csvData = filteredAgendamentos.map((agendamento) => {
+      const flags = parseCheckboxFlagsFromObservacoes(agendamento.observacoes)
+      const realizouVisita =
+        normalizeAgendamentoStage(agendamento.estagio_agendamento) === "visita_realizada" || flags.realizouVisita
+      const ganhou = normalizeAgendamentoStage(agendamento.estagio_agendamento) === "sucesso" || flags.ganho
+
+      return [
+        agendamento.nome_lead || "",
+        agendamento.telefone || "",
+        agendamento.vendedor || "",
+        agendamento.sdr_responsavel || "",
+        agendamento.data_agendamento ? formatAgendamentoDate(agendamento.data_agendamento) : "",
+        agendamento.hora_agendamento || "",
+        realizouVisita ? "Sim" : "Nao",
+        ganhou ? "Sim" : "Nao",
+        ESTAGIO_AGENDAMENTO_LABELS[
+          normalizeAgendamentoStage(agendamento.estagio_agendamento) as keyof typeof ESTAGIO_AGENDAMENTO_LABELS
+        ] || agendamento.estagio_agendamento,
+        formatHistoricoDate(agendamento.updated_at),
+      ]
+    })
+
+    const csvContent = [
+      headers.join(";"),
+      ...csvData.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(";")),
+    ].join("\n")
+
+    const blob = new Blob(["\ufeff" + csvContent], { type: "text/csv;charset=utf-8;" })
+    const link = document.createElement("a")
+    const url = URL.createObjectURL(blob)
+    link.setAttribute("href", url)
+    link.setAttribute("download", `agendamentos_${new Date().toISOString().split("T")[0]}.csv`)
+    link.style.visibility = "hidden"
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
   const handleFieldChange = (field: string, value: string) => {
     setEditedAgendamento({ ...editedAgendamento, [field]: value })
     setFormData({ ...formData, [field]: value })
@@ -1041,7 +1140,16 @@ export function AgendamentosKanban() {
 
   useEffect(() => {
     filterAgendamentos()
-  }, [agendamentos, searchTerm])
+  }, [
+    agendamentos,
+    searchTerm,
+    filterEstagio,
+    filterRealizouVisita,
+    filterGanho,
+    filterSdr,
+    filterDataAgendamentoInicio,
+    filterDataAgendamentoFim,
+  ])
 
   if (loading) {
     return (
@@ -1066,7 +1174,8 @@ export function AgendamentosKanban() {
     <div className="container mx-auto p-4 max-w-[1800px] space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <CardTitle className="flex items-center gap-2 flex-wrap">
             <Filter className="h-5 w-5" />
             Filtros
             {currentUser && (
@@ -1080,17 +1189,94 @@ export function AgendamentosKanban() {
                 Modo Visualização
               </Badge>
             )}
-          </CardTitle>
+            </CardTitle>
+            <Button variant="outline" size="sm" onClick={handleExportCSV} className="gap-2 bg-transparent">
+              <Download className="h-4 w-4" />
+              Exportar CSV
+            </Button>
+          </div>
         </CardHeader>
-        <CardContent>
-          <div className="relative">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-            <Input
-              placeholder="Buscar por nome, telefone ou vendedor..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
+            <div className="relative md:col-span-2 xl:col-span-1">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Buscar por nome, telefone ou vendedor..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+
+            <Select value={filterEstagio} onValueChange={setFilterEstagio}>
+              <SelectTrigger>
+                <SelectValue placeholder="Todos os estágios" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os estágios</SelectItem>
+                <SelectItem value="agendar">Agendar</SelectItem>
+                <SelectItem value="agendado">Agendado</SelectItem>
+                <SelectItem value="nao_compareceu">Não Compareceu</SelectItem>
+                <SelectItem value="reagendado">Reagendado</SelectItem>
+                <SelectItem value="visita_realizada">Visita Realizada</SelectItem>
+                <SelectItem value="sucesso">Sucesso</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={filterRealizouVisita} onValueChange={setFilterRealizouVisita}>
+              <SelectTrigger>
+                <SelectValue placeholder="Realizou Visita: Todos" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Realizou Visita: Todos</SelectItem>
+                <SelectItem value="sim">Realizou Visita: Sim</SelectItem>
+                <SelectItem value="nao">Realizou Visita: Não</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={filterGanho} onValueChange={setFilterGanho}>
+              <SelectTrigger>
+                <SelectValue placeholder="Ganho: Todos" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Ganho: Todos</SelectItem>
+                <SelectItem value="sim">Ganho: Sim</SelectItem>
+                <SelectItem value="nao">Ganho: Não</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={filterSdr} onValueChange={setFilterSdr}>
+              <SelectTrigger>
+                <SelectValue placeholder="Todos os SDRs" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os SDRs</SelectItem>
+                {sdrs.map((sdr) => (
+                  <SelectItem key={sdr.id} value={sdr.nome_usuario}>
+                    {sdr.nome_usuario}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-xl">
+            <div>
+              <label className="text-sm text-gray-700 mb-2 block">Data Agendamento início</label>
+              <Input
+                type="date"
+                value={filterDataAgendamentoInicio}
+                onChange={(e) => setFilterDataAgendamentoInicio(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="text-sm text-gray-700 mb-2 block">Data Agendamento fim</label>
+              <Input
+                type="date"
+                value={filterDataAgendamentoFim}
+                onChange={(e) => setFilterDataAgendamentoFim(e.target.value)}
+              />
+            </div>
           </div>
         </CardContent>
       </Card>
