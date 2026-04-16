@@ -28,6 +28,8 @@ import {
   Edit,
   Save,
   ChevronDown,
+  Tag,
+  Check,
 } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { LeadsListView } from "./leads-list-view"
@@ -53,6 +55,13 @@ import {
 import { getCurrentUser } from "@/lib/auth"
 import { createClient } from "@/utils/supabase/client"
 import { createAgendamento, registrarHistoricoMovimentacao, updateAgendamentoStageWithMotivo, type MotivoPerda } from "@/lib/agendamentos"
+import {
+  assignEtiquetaToLead,
+  getEtiquetas,
+  getLeadEtiquetasMap,
+  removeEtiquetaFromLead,
+  type Etiqueta,
+} from "@/lib/etiquetas"
 import { Input } from "@/components/ui/input" // Added Input component
 import { toast } from "@/components/ui/use-toast" // Added toast for notifications
 
@@ -98,6 +107,9 @@ export function KanbanBoard() {
   const [selectedMotivo, setSelectedMotivo] = useState<string>("")
   const [showFinalizarModal, setShowFinalizarModal] = useState(false)
   const [finalizingLead, setFinalizingLead] = useState(false)
+  const [etiquetasDisponiveis, setEtiquetasDisponiveis] = useState<Etiqueta[]>([])
+  const [leadEtiquetas, setLeadEtiquetas] = useState<Record<number, Etiqueta[]>>({})
+  const [updatingEtiquetaId, setUpdatingEtiquetaId] = useState<string | null>(null)
 
   const extractMotivo = (observacao?: string) => {
     if (!observacao) return ""
@@ -142,6 +154,15 @@ export function KanbanBoard() {
     if (user) {
       const data = await getLeads(user.id_empresa)
       setLeads(data)
+      const [etiquetas, etiquetaMap] = await Promise.all([
+        getEtiquetas(user.id_empresa),
+        getLeadEtiquetasMap(
+          user.id_empresa,
+          data.map((lead) => lead.id),
+        ),
+      ])
+      setEtiquetasDisponiveis(etiquetas)
+      setLeadEtiquetas(etiquetaMap)
     }
     setLoading(false)
   }
@@ -454,6 +475,8 @@ export function KanbanBoard() {
     return stageLeads.reduce((total, lead) => total + (lead.valor || 0), 0)
   }
 
+  const getEtiquetasDoLead = (leadId: number) => leadEtiquetas[leadId] || []
+
   const origens = [...new Set(leads.map((lead) => lead.origem).filter(Boolean))]
 
   const handleLeadsUpdate = () => {
@@ -483,6 +506,51 @@ export function KanbanBoard() {
     } catch (error) {
       console.error("[v0] Error loading vendedores:", error)
     }
+  }
+
+  const handleToggleEtiqueta = async (etiqueta: Etiqueta) => {
+    if (!selectedLead) return
+
+    const user = getCurrentUser()
+    if (!user) return
+
+    const etiquetasAtuais = getEtiquetasDoLead(selectedLead.id)
+    const jaVinculada = etiquetasAtuais.some((item) => item.id === etiqueta.id)
+
+    setUpdatingEtiquetaId(etiqueta.id)
+
+    const success = jaVinculada
+      ? await removeEtiquetaFromLead(user.id_empresa, selectedLead.id, etiqueta.id)
+      : await assignEtiquetaToLead(user.id_empresa, selectedLead.id, etiqueta.id)
+
+    if (!success) {
+      toast({
+        title: "Erro",
+        description: "Nao foi possivel atualizar a etiqueta deste lead.",
+        variant: "destructive",
+      })
+      setUpdatingEtiquetaId(null)
+      return
+    }
+
+    setLeadEtiquetas((prev) => {
+      const atuais = prev[selectedLead.id] || []
+      const proximas = jaVinculada
+        ? atuais.filter((item) => item.id !== etiqueta.id)
+        : [...atuais, etiqueta].sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"))
+
+      return {
+        ...prev,
+        [selectedLead.id]: proximas,
+      }
+    })
+
+    toast({
+      title: jaVinculada ? "Etiqueta removida" : "Etiqueta adicionada",
+      description: etiqueta.nome,
+    })
+
+    setUpdatingEtiquetaId(null)
   }
 
   const loadUsersForEdit = async () => {
@@ -1090,6 +1158,19 @@ export function KanbanBoard() {
                                           <Move className="h-3 w-3 text-gray-400 flex-shrink-0" />
                                         </div>
                                       </div>
+                                      {getEtiquetasDoLead(lead.id).length > 0 && (
+                                        <div className="flex flex-wrap gap-1">
+                                          {getEtiquetasDoLead(lead.id).map((etiqueta) => (
+                                            <span
+                                              key={etiqueta.id}
+                                              className="inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold text-white"
+                                              style={{ backgroundColor: etiqueta.cor }}
+                                            >
+                                              {etiqueta.nome}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      )}
 
                                       {/* Campo de Valor Editável */}
                                       <div
@@ -1167,7 +1248,46 @@ export function KanbanBoard() {
                     Detalhes do Lead
                   </div>
                   {selectedLead && (
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" size="sm" className="flex items-center gap-2 bg-white">
+                            <Tag className="h-4 w-4" />
+                            Adicionar Etiqueta
+                            <ChevronDown className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start" className="w-64">
+                          {etiquetasDisponiveis.length > 0 ? (
+                            etiquetasDisponiveis.map((etiqueta) => {
+                              const selecionada = getEtiquetasDoLead(selectedLead.id).some((item) => item.id === etiqueta.id)
+
+                              return (
+                                <DropdownMenuItem
+                                  key={etiqueta.id}
+                                  onClick={() => handleToggleEtiqueta(etiqueta)}
+                                  className="flex items-center justify-between gap-3"
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <span
+                                      className="h-3 w-3 rounded-full border border-black/10"
+                                      style={{ backgroundColor: etiqueta.cor }}
+                                    />
+                                    <span>{etiqueta.nome}</span>
+                                  </div>
+                                  {updatingEtiquetaId === etiqueta.id ? (
+                                    <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+                                  ) : selecionada ? (
+                                    <Check className="h-4 w-4 text-green-600" />
+                                  ) : null}
+                                </DropdownMenuItem>
+                              )
+                            })
+                          ) : (
+                            <DropdownMenuItem disabled>Nenhuma etiqueta criada em Configuracoes.</DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                       <Button
                         variant="outline"
                         size="sm"
@@ -1275,6 +1395,19 @@ export function KanbanBoard() {
                         >
                           {ESTAGIO_LABELS[selectedLead.estagio_lead as keyof typeof ESTAGIO_LABELS]}
                         </Badge>
+                        {getEtiquetasDoLead(selectedLead.id).length > 0 && (
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {getEtiquetasDoLead(selectedLead.id).map((etiqueta) => (
+                              <span
+                                key={etiqueta.id}
+                                className="inline-flex rounded-full px-3 py-1 text-xs font-semibold text-white"
+                                style={{ backgroundColor: etiqueta.cor }}
+                              >
+                                {etiqueta.nome}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
                       <Button
                         onClick={() => handleTransferClick(selectedLead)}

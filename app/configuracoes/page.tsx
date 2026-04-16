@@ -10,10 +10,12 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { User, Building, CreditCard, Users, Shield, Lock } from "lucide-react"
+import { User, Building, CreditCard, Users, Shield, Lock, Tag, Trash2 } from "lucide-react"
 import { EditProfileForm } from "@/components/edit-profile-form"
 import { AddMemberForm } from "@/components/add-member-form"
 import { MembersManagement } from "@/components/members-management"
+import { createEtiqueta, deleteEtiqueta, getEtiquetas, type Etiqueta } from "@/lib/etiquetas"
+import { toast } from "@/components/ui/use-toast"
 import {
   getCompanyMembers,
   STATUS_COLORS,
@@ -30,6 +32,11 @@ export default function Configuracoes() {
   const [companyMembers, setCompanyMembers] = useState([])
   const [isAddingMember, setIsAddingMember] = useState(false)
   const [loadingMembers, setLoadingMembers] = useState(true)
+  const [etiquetas, setEtiquetas] = useState<Etiqueta[]>([])
+  const [etiquetaNome, setEtiquetaNome] = useState("")
+  const [etiquetaCor, setEtiquetaCor] = useState("#8b5cf6")
+  const [savingEtiqueta, setSavingEtiqueta] = useState(false)
+  const [deletingEtiquetaId, setDeletingEtiquetaId] = useState<string | null>(null)
 
   useEffect(() => {
     const currentUser = getCurrentUser()
@@ -38,6 +45,7 @@ export default function Configuracoes() {
     } else {
       setUser(currentUser)
       loadCompanyMembers(currentUser.id_empresa)
+      loadEtiquetasData(currentUser.id_empresa)
     }
   }, [router])
 
@@ -59,7 +67,60 @@ export default function Configuracoes() {
   const handleMembersUpdate = () => {
     if (user) {
       loadCompanyMembers(user.id_empresa)
+      loadEtiquetasData(user.id_empresa)
     }
+  }
+
+  const loadEtiquetasData = async (idEmpresa) => {
+    const data = await getEtiquetas(idEmpresa)
+    setEtiquetas(data)
+  }
+
+  const handleCreateEtiqueta = async () => {
+    if (!user || !etiquetaNome.trim() || !canAddMembers) return
+
+    const nomeNormalizado = etiquetaNome.trim().toLowerCase()
+    if (etiquetas.some((etiqueta) => etiqueta.nome.trim().toLowerCase() === nomeNormalizado)) {
+      toast({
+        title: "Etiqueta ja existe",
+        description: "Escolha outro nome para essa etiqueta.",
+      })
+      return
+    }
+
+    setSavingEtiqueta(true)
+    const created = await createEtiqueta({
+      id_empresa: user.id_empresa,
+      nome: etiquetaNome,
+      cor: etiquetaCor,
+    })
+
+    if (created) {
+      setEtiquetas((prev) => [...prev, created].sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")))
+      setEtiquetaNome("")
+      toast({
+        title: "Etiqueta criada",
+        description: created.nome,
+      })
+    }
+
+    setSavingEtiqueta(false)
+  }
+
+  const handleDeleteEtiqueta = async (etiquetaId: string) => {
+    if (!user || !canAddMembers) return
+
+    setDeletingEtiquetaId(etiquetaId)
+    const success = await deleteEtiqueta(user.id_empresa, etiquetaId)
+
+    if (success) {
+      setEtiquetas((prev) => prev.filter((etiqueta) => etiqueta.id !== etiquetaId))
+      toast({
+        title: "Etiqueta removida",
+      })
+    }
+
+    setDeletingEtiquetaId(null)
   }
 
   if (!user) return null
@@ -235,6 +296,96 @@ export default function Configuracoes() {
                       onMembersUpdate={handleMembersUpdate}
                     />
                   )}
+                </CardContent>
+              </Card>
+
+              <Card className="md:col-span-2">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Tag className="h-5 w-5" />
+                    Criar Etiqueta
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {!isUserAdmin && (
+                    <Alert className="border-yellow-200 bg-yellow-50">
+                      <Lock className="h-4 w-4 text-yellow-600" />
+                      <AlertDescription className="text-yellow-700">
+                        Apenas administradores podem criar e excluir etiquetas.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  <div className="grid gap-4 lg:grid-cols-[1fr_220px_160px]">
+                    <div className="space-y-2">
+                      <Label htmlFor="etiqueta-nome">Nome da Etiqueta</Label>
+                      <Input
+                        id="etiqueta-nome"
+                        value={etiquetaNome}
+                        onChange={(e) => setEtiquetaNome(e.target.value)}
+                        placeholder="Ex.: Cliente quente"
+                        disabled={!isUserAdmin || savingEtiqueta}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="etiqueta-cor">Cor da Etiqueta</Label>
+                      <div className="flex items-center gap-3 rounded-md border bg-white px-3 py-2">
+                        <input
+                          id="etiqueta-cor"
+                          type="color"
+                          value={etiquetaCor}
+                          onChange={(e) => setEtiquetaCor(e.target.value)}
+                          disabled={!isUserAdmin || savingEtiqueta}
+                          className="h-8 w-10 cursor-pointer rounded border-0 bg-transparent p-0"
+                        />
+                        <span className="text-sm font-medium text-gray-600">{etiquetaCor}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-end">
+                      <Button
+                        onClick={handleCreateEtiqueta}
+                        className="w-full"
+                        disabled={!isUserAdmin || savingEtiqueta || !etiquetaNome.trim()}
+                      >
+                        {savingEtiqueta ? "Criando..." : "Criar Etiqueta"}
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border border-dashed p-4">
+                    <p className="mb-3 text-sm font-medium text-gray-700">Etiquetas criadas</p>
+                    {etiquetas.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {etiquetas.map((etiqueta) => (
+                          <div
+                            key={etiqueta.id}
+                            className="inline-flex items-center gap-2 rounded-full border bg-white px-3 py-1.5 text-sm"
+                          >
+                            <span
+                              className="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold text-white"
+                              style={{ backgroundColor: etiqueta.cor }}
+                            >
+                              {etiqueta.nome}
+                            </span>
+                            {isUserAdmin && (
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteEtiqueta(etiqueta.id)}
+                                disabled={deletingEtiquetaId === etiqueta.id}
+                                className="text-gray-400 transition hover:text-red-500 disabled:opacity-50"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-gray-500">Nenhuma etiqueta criada ainda.</p>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             </div>
