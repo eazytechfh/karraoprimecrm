@@ -24,7 +24,7 @@ export default function Dashboard() {
       <div className="flex-1 flex flex-col overflow-hidden lg:ml-0">
         {/* Header com Gradiente */}
         <header className="bg-gradient-to-r from-white via-blue-50 to-purple-50 border-b border-gray-200/50 backdrop-blur-sm">
-          <div className="container mx-auto px-6 py-6">
+          <div className="w-full px-4 py-6 sm:px-6 xl:px-8">
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-600 via-blue-600 to-cyan-500 bg-clip-text text-transparent">
@@ -46,7 +46,7 @@ export default function Dashboard() {
         </header>
 
         <main className="flex-1 overflow-x-hidden overflow-y-auto">
-          <div className="container mx-auto px-6 py-8">
+          <div className="w-full px-4 py-8 sm:px-6 xl:px-8">
             {/* Cards de Estatísticas Básicas com Espaçamento */}
             <div className="mb-12">
               <DashboardStats />
@@ -59,7 +59,7 @@ export default function Dashboard() {
 
         {/* Footer */}
         <footer className="bg-white/80 backdrop-blur-sm border-t border-gray-200/50 py-4">
-          <div className="container mx-auto px-6">
+          <div className="w-full px-4 sm:px-6 xl:px-8">
             <div className="flex items-center justify-between text-sm text-gray-500">
               <p>© 2024 Eazy Click - Plataforma de Leads</p>
               <p>Última atualização: {new Date().toLocaleString("pt-BR")}</p>

@@ -241,7 +241,7 @@ export default function HistoricoVisitasPage() {
 
         <div className="flex-1 flex flex-col overflow-hidden lg:ml-0">
           <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50">
-            <div className="container mx-auto p-6">
+            <div className="w-full p-4 sm:p-6 xl:px-8">
               <Card className="animate-pulse">
                 <CardHeader>
                   <div className="h-6 bg-gray-200 rounded w-48"></div>
@@ -269,7 +269,7 @@ export default function HistoricoVisitasPage() {
 
       <div className="flex-1 flex flex-col overflow-hidden lg:ml-0">
         <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50">
-          <div className="container mx-auto p-6 space-y-6">
+          <div className="w-full space-y-6 p-4 sm:p-6 xl:px-8">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Histórico de Visitas</h1>
               <p className="text-gray-600 mt-1">Visualize todas as visitas realizadas, reagendadas e não fechadas</p>
