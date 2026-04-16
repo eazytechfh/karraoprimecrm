@@ -37,6 +37,7 @@ import { EditableVeiculoField } from "./editable-veiculo-field"
 import { EditableEmailField } from "./editable-email-field"
 import { ProgressModal } from "./progress-modal"
 import { CreateLeadModal } from "./create-lead-modal"
+import { MotivoPerdaModal } from "./motivo-perda-modal"
 import type { Lead } from "@/types/lead"
 import {
   getLeads,
@@ -51,6 +52,7 @@ import {
 } from "@/lib/leads"
 import { getCurrentUser } from "@/lib/auth"
 import { createClient } from "@/utils/supabase/client"
+import { createAgendamento, registrarHistoricoMovimentacao, updateAgendamentoStageWithMotivo, type MotivoPerda } from "@/lib/agendamentos"
 import { Input } from "@/components/ui/input" // Added Input component
 import { toast } from "@/components/ui/use-toast" // Added toast for notifications
 
@@ -94,6 +96,8 @@ export function KanbanBoard() {
   const [availableSDRs, setAvailableSDRs] = useState<any[]>([])
   const [availableVendedores, setAvailableVendedores] = useState<any[]>([])
   const [selectedMotivo, setSelectedMotivo] = useState<string>("")
+  const [showFinalizarModal, setShowFinalizarModal] = useState(false)
+  const [finalizingLead, setFinalizingLead] = useState(false)
 
   const extractMotivo = (observacao?: string) => {
     if (!observacao) return ""
@@ -582,6 +586,107 @@ export function KanbanBoard() {
     })
   }
 
+  const handleFinalizarLead = async (motivo: MotivoPerda, dataPerda: string) => {
+    if (!selectedLead) return
+
+    setFinalizingLead(true)
+
+    try {
+      const supabase = createClient()
+      const user = getCurrentUser()
+      const observacaoAtualizada = upsertMotivoInObservacao(selectedLead.observacao_vendedor, motivo)
+
+      const motivoSalvo = await updateLeadObservacao(selectedLead.id, observacaoAtualizada)
+
+      if (!motivoSalvo) {
+        throw new Error("Não foi possível salvar o motivo no lead.")
+      }
+
+      const { data: agendamentoExistente, error: fetchError } = await supabase
+        .from("AGENDAMENTOS")
+        .select("id, estagio_agendamento")
+        .eq("id_lead", selectedLead.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (fetchError) {
+        throw fetchError
+      }
+
+      if (agendamentoExistente) {
+        const updated = await updateAgendamentoStageWithMotivo(agendamentoExistente.id, "insucesso", motivo)
+        if (!updated) {
+          throw new Error("Não foi possível atualizar o agendamento para insucesso.")
+        }
+
+        await supabase
+          .from("AGENDAMENTOS")
+          .update({
+            data_perda: dataPerda,
+            motivo_perda: motivo,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", agendamentoExistente.id)
+      } else {
+        const novoAgendamento = await createAgendamento({
+          id_empresa: selectedLead.id_empresa,
+          id_lead: selectedLead.id,
+          nome_lead: selectedLead.nome_lead,
+          telefone: selectedLead.telefone || null,
+          email: selectedLead.email || null,
+          modelo_veiculo: selectedLead.veiculo_interesse || null,
+          vendedor: selectedLead.vendedor || null,
+          sdr_responsavel: selectedLead.sdr_responsavel || null,
+          estagio_agendamento: "insucesso",
+          motivo_perda: motivo,
+          data_perda: dataPerda,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        } as any)
+
+        if (!novoAgendamento) {
+          throw new Error("Não foi possível criar o agendamento em insucesso.")
+        }
+
+        if (user) {
+          await registrarHistoricoMovimentacao(
+            novoAgendamento.id,
+            novoAgendamento.id_empresa,
+            undefined,
+            "insucesso",
+            user.nome_usuario,
+            user.cargo || "",
+            motivo,
+          )
+        }
+      }
+
+      setLeads((prev) =>
+        prev.map((lead) =>
+          lead.id === selectedLead.id ? { ...lead, observacao_vendedor: observacaoAtualizada, estagio_lead: "resgate" } : lead,
+        ),
+      )
+      setSelectedMotivo(motivo)
+      setSelectedLead(null)
+      setShowFinalizarModal(false)
+
+      toast({
+        title: "Lead finalizado",
+        description: "O lead foi enviado para Agendamentos na etapa Insucesso.",
+      })
+    } catch (error) {
+      console.error("[v0] Error finalizing lead:", error)
+      toast({
+        title: "Erro",
+        description: "Não foi possível finalizar o lead.",
+        variant: "destructive",
+      })
+    } finally {
+      setFinalizingLead(false)
+    }
+  }
+
   const handleVendedorSelected = async () => {
     if (!selectedVendedor || transferring) return
     await handleConfirmTransfer()
@@ -784,6 +889,17 @@ export function KanbanBoard() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <MotivoPerdaModal
+        isOpen={showFinalizarModal}
+        onClose={() => {
+          if (!finalizingLead) {
+            setShowFinalizarModal(false)
+          }
+        }}
+        onConfirm={handleFinalizarLead}
+        leadName={selectedLead?.nome_lead || ""}
+      />
 
       {/* View Toggle */}
       <Card>
@@ -1038,6 +1154,7 @@ export function KanbanBoard() {
             open={!!selectedLead}
             onOpenChange={() => {
               setSelectedLead(null)
+              setShowFinalizarModal(false)
               setIsEditMode(false) // Reset edit mode when closing
               setEditedLead(null) // Clear editedLead when closing
             }}
@@ -1051,6 +1168,22 @@ export function KanbanBoard() {
                   </div>
                   {selectedLead && (
                     <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowFinalizarModal(true)}
+                        disabled={finalizingLead}
+                        className="flex items-center gap-2 bg-white"
+                      >
+                        {finalizingLead ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Finalizando...
+                          </>
+                        ) : (
+                          "Finalizar"
+                        )}
+                      </Button>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="outline" size="sm" className="flex items-center gap-2 bg-white">
