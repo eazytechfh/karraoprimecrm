@@ -37,8 +37,11 @@ interface LeadsListViewProps {
   onLeadsUpdate: () => void
 }
 
+const PAGE_SIZE = 50
+
 export function LeadsListView({ leads, onLeadsUpdate }: LeadsListViewProps) {
   const [filteredLeads, setFilteredLeads] = useState<Lead[]>(leads)
+  const [currentPage, setCurrentPage] = useState(1)
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [filterOrigem, setFilterOrigem] = useState("")
@@ -61,6 +64,7 @@ export function LeadsListView({ leads, onLeadsUpdate }: LeadsListViewProps) {
 
   useEffect(() => {
     filterLeads()
+    setCurrentPage(1)
   }, [leads, searchTerm, filterOrigem, filterEstagio, filterSdr, filterDataInicio, filterDataFim, filterVeiculo])
 
   useEffect(() => {
@@ -129,9 +133,12 @@ export function LeadsListView({ leads, onLeadsUpdate }: LeadsListViewProps) {
     setFilteredLeads(filtered)
   }
 
+  const paginatedLeads = filteredLeads.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+  const totalPages = Math.ceil(filteredLeads.length / PAGE_SIZE)
+
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelectedLeadIds(filteredLeads.map((lead) => lead.id))
+      setSelectedLeadIds(paginatedLeads.map((lead) => lead.id))
     } else {
       setSelectedLeadIds([])
     }
@@ -610,7 +617,14 @@ export function LeadsListView({ leads, onLeadsUpdate }: LeadsListViewProps) {
 
       <Card>
         <CardHeader>
-          <CardTitle>Lista de Leads ({filteredLeads.length})</CardTitle>
+          <CardTitle>
+            Lista de Leads ({filteredLeads.length})
+            {totalPages > 1 && (
+              <span className="text-sm font-normal text-gray-500 ml-2">
+                — página {currentPage} de {totalPages}
+              </span>
+            )}
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -619,7 +633,7 @@ export function LeadsListView({ leads, onLeadsUpdate }: LeadsListViewProps) {
                 <TableRow>
                   <TableHead className="w-12">
                     <Checkbox
-                      checked={selectedLeadIds.length === filteredLeads.length && filteredLeads.length > 0}
+                      checked={selectedLeadIds.length === paginatedLeads.length && paginatedLeads.length > 0}
                       onCheckedChange={handleSelectAll}
                     />
                   </TableHead>
@@ -636,7 +650,7 @@ export function LeadsListView({ leads, onLeadsUpdate }: LeadsListViewProps) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredLeads.map((lead) => (
+                {paginatedLeads.map((lead) => (
                   <TableRow key={lead.id} className="hover:bg-gray-50">
                     <TableCell>
                       <Checkbox
@@ -728,6 +742,32 @@ export function LeadsListView({ leads, onLeadsUpdate }: LeadsListViewProps) {
           {filteredLeads.length === 0 && (
             <div className="text-center py-8 text-gray-500">
               <p>Nenhum lead encontrado com os filtros aplicados.</p>
+            </div>
+          )}
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mt-4 pt-4 border-t">
+              <span className="text-sm text-gray-500">
+                Página {currentPage} de {totalPages} ({filteredLeads.length} leads)
+              </span>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                >
+                  Anterior
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  Próxima
+                </Button>
+              </div>
             </div>
           )}
         </CardContent>

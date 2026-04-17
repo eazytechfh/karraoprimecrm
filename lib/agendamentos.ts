@@ -650,32 +650,30 @@ export async function getHistoricoVisitas(
     dataInicio?: string
     dataFim?: string
     vendedor?: string
-    sdr?: string // Added SDR filter parameter
-    status?: string // Added status filter parameter
+    sdr?: string
+    status?: string
     periodo?: "hoje" | "ultimos7dias"
   },
-): Promise<Agendamento[]> {
+  pagination?: { page: number; pageSize: number },
+): Promise<{ data: Agendamento[]; total: number }> {
   const supabase = createClient()
   const user = getCurrentUser()
 
   let query = supabase
     .from("AGENDAMENTOS")
-    .select("*")
+    .select("*", { count: "exact" })
     .eq("id_empresa", idEmpresa)
     .in("estagio_agendamento", ["agendar", "nao_compareceu", "reagendado", "visita_realizada", "sucesso", "insucesso"])
     .order("updated_at", { ascending: false })
 
-  // Filter by vendedor role
   if (user && user.cargo === "vendedor") {
     query = query.eq("vendedor", user.nome_usuario)
   }
 
-  // Filter by SDR role
   if (user && user.cargo === "sdr") {
     query = query.eq("sdr_responsavel", user.nome_usuario)
   }
 
-  // Apply filters
   if (filters?.vendedor) {
     query = query.eq("vendedor", filters.vendedor)
   }
@@ -707,17 +705,26 @@ export async function getHistoricoVisitas(
     query = query.lt("updated_at", dataFimAjustada.toISOString())
   }
 
-  const { data, error } = await query
+  if (pagination) {
+    const from = (pagination.page - 1) * pagination.pageSize
+    const to = from + pagination.pageSize - 1
+    query = query.range(from, to)
+  }
+
+  const { data, error, count } = await query
 
   if (error) {
     console.error("[v0] Error fetching histórico visitas:", error)
-    return []
+    return { data: [], total: 0 }
   }
 
-  return (data || []).map((agendamento) => ({
-    ...agendamento,
-    estagio_agendamento: normalizeAgendamentoStage(agendamento.estagio_agendamento),
-  }))
+  return {
+    data: (data || []).map((agendamento) => ({
+      ...agendamento,
+      estagio_agendamento: normalizeAgendamentoStage(agendamento.estagio_agendamento),
+    })),
+    total: count ?? 0,
+  }
 }
 
 export async function marcarRealizouVisita(id: number): Promise<boolean> {
