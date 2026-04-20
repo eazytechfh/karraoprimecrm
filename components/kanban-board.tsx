@@ -1291,10 +1291,23 @@ export function KanbanBoard() {
                                           {getEtiquetasDoLead(lead.id).map((etiqueta) => (
                                             <span
                                               key={etiqueta.id}
-                                              className="inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold text-white"
+                                              className="inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[10px] font-semibold text-white"
                                               style={{ backgroundColor: etiqueta.cor }}
                                             >
                                               {etiqueta.nome}
+                                              <button
+                                                onClick={(e) => {
+                                                  e.stopPropagation()
+                                                  setSelectedLead(lead)
+                                                  handleToggleEtiqueta(etiqueta)
+                                                }}
+                                                disabled={updatingEtiquetaId === etiqueta.id}
+                                                className="ml-0.5 opacity-70 hover:opacity-100 disabled:opacity-40"
+                                              >
+                                                {updatingEtiquetaId === etiqueta.id
+                                                  ? <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                                                  : <X className="h-2.5 w-2.5" />}
+                                              </button>
                                             </span>
                                           ))}
                                         </div>
@@ -1549,10 +1562,19 @@ export function KanbanBoard() {
                             {getEtiquetasDoLead(selectedLead.id).map((etiqueta) => (
                               <span
                                 key={etiqueta.id}
-                                className="inline-flex rounded-full px-3 py-1 text-xs font-semibold text-white"
+                                className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold text-white"
                                 style={{ backgroundColor: etiqueta.cor }}
                               >
                                 {etiqueta.nome}
+                                <button
+                                  onClick={() => handleToggleEtiqueta(etiqueta)}
+                                  disabled={updatingEtiquetaId === etiqueta.id}
+                                  className="ml-0.5 rounded-full opacity-70 hover:opacity-100 disabled:opacity-40"
+                                >
+                                  {updatingEtiquetaId === etiqueta.id
+                                    ? <Loader2 className="h-3 w-3 animate-spin" />
+                                    : <X className="h-3 w-3" />}
+                                </button>
                               </span>
                             ))}
                           </div>

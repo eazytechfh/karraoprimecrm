@@ -75,8 +75,7 @@ export function canAccessEstoque(user: User | null): boolean {
 
 // Verifica se o usuário pode acessar Configurações
 export function canAccessConfiguracoes(user: User | null): boolean {
-  // Apenas administrador e gestor
-  return hasFullAccess(user)
+  return user !== null
 }
 
 // Verifica se o usuário pode editar cards (leads/agendamentos)

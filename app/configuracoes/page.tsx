@@ -141,6 +141,7 @@ export default function Configuracoes() {
   const adminMembers = companyMembers.filter((member) => member.cargo === "administrador")
   const canAddMembers = canManageMembers(user)
   const isUserAdmin = canManageMembers(user)
+  const canCreateEtiqueta = !!user
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -320,10 +321,10 @@ export default function Configuracoes() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {!isUserAdmin && (
-                    <Alert className="border-yellow-200 bg-yellow-50">
-                      <Lock className="h-4 w-4 text-yellow-600" />
-                      <AlertDescription className="text-yellow-700">
-                        Apenas administradores podem criar e excluir etiquetas.
+                    <Alert className="border-blue-200 bg-blue-50">
+                      <Lock className="h-4 w-4 text-blue-600" />
+                      <AlertDescription className="text-blue-700">
+                        Apenas administradores podem excluir etiquetas.
                       </AlertDescription>
                     </Alert>
                   )}
@@ -336,7 +337,7 @@ export default function Configuracoes() {
                         value={etiquetaNome}
                         onChange={(e) => setEtiquetaNome(e.target.value)}
                         placeholder="Ex.: Cliente quente"
-                        disabled={!isUserAdmin || savingEtiqueta}
+                        disabled={!canCreateEtiqueta || savingEtiqueta}
                       />
                     </div>
 
@@ -348,7 +349,7 @@ export default function Configuracoes() {
                           type="color"
                           value={etiquetaCor}
                           onChange={(e) => setEtiquetaCor(e.target.value)}
-                          disabled={!isUserAdmin || savingEtiqueta}
+                          disabled={!canCreateEtiqueta || savingEtiqueta}
                           className="h-8 w-10 cursor-pointer rounded border-0 bg-transparent p-0"
                         />
                         <span className="text-sm font-medium text-gray-600">{etiquetaCor}</span>
@@ -359,7 +360,7 @@ export default function Configuracoes() {
                       <Button
                         onClick={handleCreateEtiqueta}
                         className="w-full"
-                        disabled={!isUserAdmin || savingEtiqueta || !etiquetaNome.trim()}
+                        disabled={!canCreateEtiqueta || savingEtiqueta || !etiquetaNome.trim()}
                       >
                         {savingEtiqueta ? "Criando..." : "Criar Etiqueta"}
                       </Button>
