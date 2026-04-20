@@ -1512,26 +1512,28 @@ export function KanbanBoard() {
                             Salvar
                           </Button>
                         )}
-                      {/* Delete Lead button */}
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => handleDeleteLead(selectedLead.id)}
-                        disabled={deletingLead === selectedLead.id}
-                        className="flex items-center gap-2"
-                      >
-                        {deletingLead === selectedLead.id ? (
-                          <>
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                            Excluindo...
-                          </>
-                        ) : (
-                          <>
-                            <Trash2 className="h-4 w-4" />
-                            Excluir Lead
-                          </>
-                        )}
-                      </Button>
+                      {/* Delete Lead button — apenas admin/gestor */}
+                      {(() => { const u = getCurrentUser(); return u && u.cargo !== "sdr" && u.cargo !== "vendedor" })() && (
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => handleDeleteLead(selectedLead.id)}
+                          disabled={deletingLead === selectedLead.id}
+                          className="flex items-center gap-2"
+                        >
+                          {deletingLead === selectedLead.id ? (
+                            <>
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              Excluindo...
+                            </>
+                          ) : (
+                            <>
+                              <Trash2 className="h-4 w-4" />
+                              Excluir Lead
+                            </>
+                          )}
+                        </Button>
+                      )}
                     </div>
                   )}
                 </DialogTitle>

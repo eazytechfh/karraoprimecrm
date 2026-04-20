@@ -30,6 +30,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { ProgressModal } from "./progress-modal"
 import { SendMessageModal } from "./send-message-modal"
 import { formatLeadHistoryDate, getLeadHistory, type LeadHistorico } from "@/lib/lead-history"
+import { getCurrentUser } from "@/lib/auth"
 import { Filter, Search, ChevronDown, Trash2, Send, MessageSquare, Phone, Mail, Move, User } from "lucide-react"
 
 interface LeadsListViewProps {
@@ -578,10 +579,12 @@ export function LeadsListView({ leads, onLeadsUpdate }: LeadsListViewProps) {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={handleDeleteSelected} className="text-red-600">
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Excluir
-                    </DropdownMenuItem>
+                    {(() => { const u = getCurrentUser(); return u && u.cargo !== "sdr" && u.cargo !== "vendedor" })() && (
+                      <DropdownMenuItem onClick={handleDeleteSelected} className="text-red-600">
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Excluir
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuItem onClick={handleSendFollowUp}>
                       <Send className="h-4 w-4 mr-2" />
                       Enviar Follow Up

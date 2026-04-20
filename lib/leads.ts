@@ -846,6 +846,12 @@ export async function getLeadStats(idEmpresa: number) {
 }
 
 export async function deleteLead(leadId: number): Promise<boolean> {
+  const user = getCurrentUser()
+  if (user && (user.cargo === "sdr" || user.cargo === "vendedor")) {
+    console.warn("deleteLead: cargo sem permissão:", user.cargo)
+    return false
+  }
+
   const supabase = createClient()
 
   try {
@@ -865,6 +871,12 @@ export async function deleteLead(leadId: number): Promise<boolean> {
 }
 
 export async function deleteLeads(leadIds: number[]): Promise<boolean> {
+  const user = getCurrentUser()
+  if (user && (user.cargo === "sdr" || user.cargo === "vendedor")) {
+    console.warn("deleteLeads: cargo sem permissão:", user.cargo)
+    return false
+  }
+
   const supabase = createClient()
 
   try {
