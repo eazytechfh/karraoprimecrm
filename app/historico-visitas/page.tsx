@@ -14,15 +14,106 @@ import {
   getHistoricoVisitas,
   getVendedores,
   getSdrs,
+  getSdrPerformanceStats,
   shouldAppearInRealizouVisitaColumn,
   type Agendamento,
   type Vendedor,
+  type SdrStats,
   ESTAGIO_AGENDAMENTO_LABELS,
   normalizeAgendamentoStage,
 } from "@/lib/agendamentos"
 import { Calendar, Phone, User, Clock, Filter, Download } from "lucide-react"
 
 const PAGE_SIZE = 50
+
+function pct(num: number, den: number) {
+  if (!den) return "0%"
+  return `${((num / den) * 100).toFixed(1)}%`
+}
+
+function FunnelRow({ label, sublabel, stats }: { label: string; sublabel?: string; stats: SdrStats }) {
+  return (
+    <div className="mb-1">
+      <div className="grid grid-cols-5 gap-px">
+        <div className="flex flex-col items-center justify-center bg-cyan-100 px-3 py-3 rounded-tl rounded-bl">
+          <span className="text-[11px] font-bold text-cyan-900 uppercase tracking-wide">{label}</span>
+          {sublabel && <span className="text-sm font-semibold text-cyan-800 mt-0.5">{sublabel}</span>}
+        </div>
+        <div className="flex flex-col items-center justify-center bg-slate-200 px-3 py-3">
+          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Leads</span>
+          <span className="text-xl font-bold text-slate-700">{stats.leads.toLocaleString("pt-BR")}</span>
+        </div>
+        <div className="flex flex-col items-center justify-center bg-cyan-100 px-3 py-3">
+          <span className="text-[10px] font-bold text-cyan-700 uppercase tracking-wide">Agendamentos</span>
+          <span className="text-xl font-bold text-cyan-900">{stats.agendamentos.toLocaleString("pt-BR")}</span>
+        </div>
+        <div className="flex flex-col items-center justify-center bg-cyan-100 px-3 py-3">
+          <span className="text-[10px] font-bold text-cyan-700 uppercase tracking-wide">Visitas</span>
+          <span className="text-xl font-bold text-cyan-900">{stats.visitas.toLocaleString("pt-BR")}</span>
+        </div>
+        <div className="flex flex-col items-center justify-center bg-cyan-100 px-3 py-3 rounded-tr rounded-br">
+          <span className="text-[10px] font-bold text-cyan-700 uppercase tracking-wide">Sucesso</span>
+          <span className="text-xl font-bold text-cyan-900">{stats.sucesso.toLocaleString("pt-BR")}</span>
+        </div>
+      </div>
+      {/* Badges de conversão */}
+      <div className="grid grid-cols-5 gap-px mt-1">
+        <div />
+        <div className="flex justify-end pr-1">
+          <span className="inline-flex flex-col items-center bg-teal-400 text-white text-[10px] font-bold rounded px-3 py-0.5 leading-tight">
+            <span className="uppercase tracking-wide">Conversão</span>
+            <span>{pct(stats.agendamentos, stats.leads)}</span>
+          </span>
+        </div>
+        <div className="flex justify-end pr-1">
+          <span className="inline-flex flex-col items-center bg-teal-400 text-white text-[10px] font-bold rounded px-3 py-0.5 leading-tight">
+            <span className="uppercase tracking-wide">Conversão</span>
+            <span>{pct(stats.visitas, stats.agendamentos)}</span>
+          </span>
+        </div>
+        <div className="flex justify-end pr-1">
+          <span className="inline-flex flex-col items-center bg-teal-400 text-white text-[10px] font-bold rounded px-3 py-0.5 leading-tight">
+            <span className="uppercase tracking-wide">Conversão</span>
+            <span>{pct(stats.sucesso, stats.visitas)}</span>
+          </span>
+        </div>
+        <div />
+      </div>
+    </div>
+  )
+}
+
+function SdrFunnelTable({ stats }: { stats: SdrStats[] }) {
+  const total: SdrStats = stats.reduce(
+    (acc, s) => ({
+      sdr: "KARRAO",
+      leads: acc.leads + s.leads,
+      agendamentos: acc.agendamentos + s.agendamentos,
+      visitas: acc.visitas + s.visitas,
+      sucesso: acc.sucesso + s.sucesso,
+    }),
+    { sdr: "", leads: 0, agendamentos: 0, visitas: 0, sucesso: 0 },
+  )
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border p-6">
+      <div className="text-center mb-6">
+        <h2 className="text-2xl font-black tracking-widest uppercase text-gray-900">Performance SDR</h2>
+        <p className="text-sm font-semibold tracking-widest uppercase text-gray-500 mt-1">Karrao Multimarcas</p>
+      </div>
+
+      <div className="space-y-4">
+        {stats.map((s) => (
+          <FunnelRow key={s.sdr} label="SDR" sublabel={s.sdr} stats={s} />
+        ))}
+      </div>
+
+      <div className="mt-8 pt-6 border-t border-dashed border-gray-200">
+        <FunnelRow label="Setor Web" sublabel="Karrao" stats={total} />
+      </div>
+    </div>
+  )
+}
 
 export default function HistoricoVisitasPage() {
   const router = useRouter()
@@ -34,6 +125,7 @@ export default function HistoricoVisitasPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
   const [totalRecords, setTotalRecords] = useState(0)
+  const [sdrStats, setSdrStats] = useState<SdrStats[]>([])
 
   const [filters, setFilters] = useState({
     periodo: "",
@@ -65,10 +157,11 @@ export default function HistoricoVisitasPage() {
 
     const filterParams = buildFilterParams()
 
-    const [historicoResult, vendedoresData, sdrsData] = await Promise.all([
+    const [historicoResult, vendedoresData, sdrsData, statsData] = await Promise.all([
       getHistoricoVisitas(currentUser.id_empresa, filterParams, { page, pageSize: PAGE_SIZE }),
       page === 1 ? getVendedores(currentUser.id_empresa) : Promise.resolve(null),
       page === 1 ? getSdrs(currentUser.id_empresa) : Promise.resolve(null),
+      page === 1 ? getSdrPerformanceStats(currentUser.id_empresa) : Promise.resolve(null),
     ])
 
     setHistorico(historicoResult.data)
@@ -76,6 +169,7 @@ export default function HistoricoVisitasPage() {
     setCurrentPage(page)
     if (vendedoresData) setVendedores(vendedoresData)
     if (sdrsData) setSdrs(sdrsData)
+    if (statsData) setSdrStats(statsData)
     setLoading(false)
   }
 
@@ -292,6 +386,9 @@ export default function HistoricoVisitasPage() {
               <h1 className="text-3xl font-bold text-gray-900">Histórico de Visitas</h1>
               <p className="text-gray-600 mt-1">Visualize todas as visitas realizadas, reagendadas e não fechadas</p>
             </div>
+
+            {/* ── Performance SDR ── */}
+            {sdrStats.length > 0 && <SdrFunnelTable stats={sdrStats} />}
 
             <Card>
               <CardHeader>

@@ -727,6 +727,66 @@ export async function getHistoricoVisitas(
   }
 }
 
+export interface SdrStats {
+  sdr: string
+  leads: number
+  agendamentos: number
+  visitas: number
+  sucesso: number
+}
+
+export async function getSdrPerformanceStats(idEmpresa: number): Promise<SdrStats[]> {
+  const supabase = createClient()
+  const user = getCurrentUser()
+
+  const statsMap: Record<string, SdrStats> = {}
+
+  // Leads por SDR
+  let leadsQuery = supabase
+    .from("BASE_DE_LEADS")
+    .select("sdr_responsavel")
+    .eq("id_empresa", idEmpresa)
+    .not("sdr_responsavel", "is", null)
+
+  if (user?.cargo === "sdr") leadsQuery = leadsQuery.eq("sdr_responsavel", user.nome_usuario)
+
+  const { data: leadsData } = await leadsQuery
+
+  for (const row of leadsData || []) {
+    const sdr = row.sdr_responsavel as string
+    if (!statsMap[sdr]) statsMap[sdr] = { sdr, leads: 0, agendamentos: 0, visitas: 0, sucesso: 0 }
+    statsMap[sdr].leads++
+  }
+
+  // Agendamentos por SDR
+  let agQuery = supabase
+    .from("AGENDAMENTOS")
+    .select("sdr_responsavel, estagio_agendamento")
+    .eq("id_empresa", idEmpresa)
+    .not("sdr_responsavel", "is", null)
+
+  if (user?.cargo === "sdr") agQuery = agQuery.eq("sdr_responsavel", user.nome_usuario)
+
+  const { data: agData } = await agQuery
+
+  for (const row of agData || []) {
+    const sdr = row.sdr_responsavel as string
+    if (!statsMap[sdr]) statsMap[sdr] = { sdr, leads: 0, agendamentos: 0, visitas: 0, sucesso: 0 }
+
+    const estagio = normalizeAgendamentoStage(row.estagio_agendamento)
+    statsMap[sdr].agendamentos++
+
+    if (["visita_realizada", "sucesso", "insucesso"].includes(estagio)) {
+      statsMap[sdr].visitas++
+    }
+    if (estagio === "sucesso") {
+      statsMap[sdr].sucesso++
+    }
+  }
+
+  return Object.values(statsMap).sort((a, b) => a.sdr.localeCompare(b.sdr, "pt-BR"))
+}
+
 export async function marcarRealizouVisita(id: number): Promise<boolean> {
   const supabase = createClient()
   const { data: agendamento } = await supabase.from("AGENDAMENTOS").select("*").eq("id", id).single()
