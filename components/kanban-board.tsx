@@ -54,7 +54,7 @@ import {
 } from "@/lib/leads"
 import { getCurrentUser } from "@/lib/auth"
 import { createClient } from "@/utils/supabase/client"
-import { createAgendamento, registrarHistoricoMovimentacao, updateAgendamentoStageWithMotivo, type MotivoPerda } from "@/lib/agendamentos"
+import { createAgendamento, registrarHistoricoMovimentacao, updateAgendamentoStageWithMotivo, getSdrs, type MotivoPerda } from "@/lib/agendamentos"
 import {
   assignEtiquetaToLead,
   getEtiquetas,
@@ -120,6 +120,7 @@ export function KanbanBoard() {
   const [editedLead, setEditedLead] = useState<any>(null)
   const [availableSDRs, setAvailableSDRs] = useState<any[]>([])
   const [availableVendedores, setAvailableVendedores] = useState<any[]>([])
+  const [realSdrList, setRealSdrList] = useState<string[]>([])
   const [selectedMotivo, setSelectedMotivo] = useState<string>("")
   const [showFinalizarModal, setShowFinalizarModal] = useState(false)
   const [finalizingLead, setFinalizingLead] = useState(false)
@@ -189,7 +190,7 @@ export function KanbanBoard() {
     if (user) {
       const data = await getLeads(user.id_empresa)
       setLeads(data)
-      const [etiquetas, etiquetaMap, latestHistoryMap] = await Promise.all([
+      const [etiquetas, etiquetaMap, latestHistoryMap, sdrsData] = await Promise.all([
         getEtiquetas(user.id_empresa),
         getLeadEtiquetasMap(
           user.id_empresa,
@@ -199,10 +200,12 @@ export function KanbanBoard() {
           user.id_empresa,
           data.map((lead) => lead.id),
         ),
+        getSdrs(user.id_empresa),
       ])
       setEtiquetasDisponiveis(etiquetas)
       setLeadEtiquetas(etiquetaMap)
       setLeadLatestHistory(latestHistoryMap)
+      setRealSdrList(sdrsData.map((s) => s.nome_usuario))
     }
     setLoading(false)
   }
@@ -581,7 +584,6 @@ export function KanbanBoard() {
   }
 
   const origens = [...new Set(leads.map((lead) => lead.origem).filter(Boolean))]
-  const sdrs = [...new Set(leads.map((lead) => lead.sdr_responsavel).filter(Boolean))]
 
   const handleLeadsUpdate = () => {
     loadLeads()
@@ -1203,8 +1205,8 @@ export function KanbanBoard() {
                 <div>
                   <select value={filterSdr} onChange={(e) => setFilterSdr(e.target.value)}>
                     <option value="all">Todos os SDRs</option>
-                    {sdrs.map((sdr) => (
-                      <option key={sdr} value={sdr!}>
+                    {realSdrList.map((sdr) => (
+                      <option key={sdr} value={sdr}>
                         {sdr}
                       </option>
                     ))}

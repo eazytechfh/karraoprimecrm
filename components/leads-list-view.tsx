@@ -31,6 +31,7 @@ import { ProgressModal } from "./progress-modal"
 import { SendMessageModal } from "./send-message-modal"
 import { formatLeadHistoryDate, getLeadHistory, type LeadHistorico } from "@/lib/lead-history"
 import { getCurrentUser } from "@/lib/auth"
+import { getSdrs } from "@/lib/agendamentos"
 import { Filter, Search, ChevronDown, Trash2, Send, MessageSquare, Phone, Mail, Move, User } from "lucide-react"
 
 interface LeadsListViewProps {
@@ -55,6 +56,8 @@ export function LeadsListView({ leads, onLeadsUpdate }: LeadsListViewProps) {
   const [showMessageModal, setShowMessageModal] = useState(false)
   const [actionMessage, setActionMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
 
+  const [realSdrs, setRealSdrs] = useState<string[]>([])
+
   const [updatingStage, setUpdatingStage] = useState<number | null>(null)
   const [bulkUpdatingStage, setBulkUpdatingStage] = useState<string | null>(null)
   const [generatingResumo, setGeneratingResumo] = useState(false)
@@ -62,6 +65,12 @@ export function LeadsListView({ leads, onLeadsUpdate }: LeadsListViewProps) {
   const [showProgressModal, setShowProgressModal] = useState(false)
   const [selectedLeadHistory, setSelectedLeadHistory] = useState<LeadHistorico[]>([])
   const [loadingLeadHistory, setLoadingLeadHistory] = useState(false)
+
+  useEffect(() => {
+    const idEmpresa = leads[0]?.id_empresa
+    if (!idEmpresa) return
+    getSdrs(idEmpresa).then((sdrsData) => setRealSdrs(sdrsData.map((s) => s.nome_usuario)))
+  }, [])
 
   useEffect(() => {
     filterLeads()
@@ -416,7 +425,6 @@ export function LeadsListView({ leads, onLeadsUpdate }: LeadsListViewProps) {
 
   const origens = [...new Set(leads.map((lead) => lead.origem).filter(Boolean))]
   const veiculos = [...new Set(leads.map((lead) => lead.veiculo_interesse).filter(Boolean))]
-  const sdrs = [...new Set(leads.map((lead) => lead.sdr_responsavel).filter(Boolean))]
 
   return (
     <div className="space-y-4">
@@ -495,8 +503,8 @@ export function LeadsListView({ leads, onLeadsUpdate }: LeadsListViewProps) {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos os SDRs</SelectItem>
-                {sdrs.map((sdr) => (
-                  <SelectItem key={sdr} value={sdr!}>
+                {realSdrs.map((sdr) => (
+                  <SelectItem key={sdr} value={sdr}>
                     {sdr}
                   </SelectItem>
                 ))}
