@@ -739,39 +739,58 @@ export async function getSdrPerformanceStats(idEmpresa: number): Promise<SdrStat
   const supabase = createClient()
   const user = getCurrentUser()
 
-  const statsMap: Record<string, SdrStats> = {}
+  const now = new Date()
+  const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
 
-  // Leads por SDR
+  // Only real SDRs from AUTORIZAÇÃO table
+  const { data: sdrsData } = await supabase
+    .from("AUTORIZAÇÃO")
+    .select("nome_usuario")
+    .eq("id_empresa", idEmpresa)
+    .eq("cargo", "sdr")
+
+  const realSdrs = new Set((sdrsData || []).map((s) => s.nome_usuario as string))
+  if (realSdrs.size === 0) return []
+
+  const statsMap: Record<string, SdrStats> = {}
+  for (const sdrName of realSdrs) {
+    statsMap[sdrName] = { sdr: sdrName, leads: 0, agendamentos: 0, visitas: 0, sucesso: 0 }
+  }
+
+  const sdrFilter = user?.cargo === "sdr" ? user.nome_usuario : null
+
+  // Leads por SDR (mês atual)
   let leadsQuery = supabase
     .from("BASE_DE_LEADS")
     .select("sdr_responsavel")
     .eq("id_empresa", idEmpresa)
     .not("sdr_responsavel", "is", null)
+    .gte("created_at", firstOfMonth)
 
-  if (user?.cargo === "sdr") leadsQuery = leadsQuery.eq("sdr_responsavel", user.nome_usuario)
+  if (sdrFilter) leadsQuery = leadsQuery.eq("sdr_responsavel", sdrFilter)
 
   const { data: leadsData } = await leadsQuery
 
   for (const row of leadsData || []) {
     const sdr = row.sdr_responsavel as string
-    if (!statsMap[sdr]) statsMap[sdr] = { sdr, leads: 0, agendamentos: 0, visitas: 0, sucesso: 0 }
-    statsMap[sdr].leads++
+    if (statsMap[sdr]) statsMap[sdr].leads++
   }
 
-  // Agendamentos por SDR
+  // Agendamentos por SDR (mês atual)
   let agQuery = supabase
     .from("AGENDAMENTOS")
     .select("sdr_responsavel, estagio_agendamento")
     .eq("id_empresa", idEmpresa)
     .not("sdr_responsavel", "is", null)
+    .gte("created_at", firstOfMonth)
 
-  if (user?.cargo === "sdr") agQuery = agQuery.eq("sdr_responsavel", user.nome_usuario)
+  if (sdrFilter) agQuery = agQuery.eq("sdr_responsavel", sdrFilter)
 
   const { data: agData } = await agQuery
 
   for (const row of agData || []) {
     const sdr = row.sdr_responsavel as string
-    if (!statsMap[sdr]) statsMap[sdr] = { sdr, leads: 0, agendamentos: 0, visitas: 0, sucesso: 0 }
+    if (!statsMap[sdr]) continue
 
     const estagio = normalizeAgendamentoStage(row.estagio_agendamento)
     statsMap[sdr].agendamentos++
