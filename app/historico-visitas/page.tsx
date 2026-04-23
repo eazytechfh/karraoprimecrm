@@ -26,6 +26,18 @@ import { Calendar, Phone, User, Clock, Filter, Download } from "lucide-react"
 
 const PAGE_SIZE = 50
 
+function getCurrentMonthDateRange() {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, "0")
+  const day = String(now.getDate()).padStart(2, "0")
+
+  return {
+    dataInicio: `${year}-${month}-01`,
+    dataFim: `${year}-${month}-${day}`,
+  }
+}
+
 function pct(num: number, den: number) {
   if (!den) return "0%"
   return `${((num / den) * 100).toFixed(1)}%`
@@ -99,7 +111,7 @@ function SdrFunnelTable({ stats }: { stats: SdrStats[] }) {
     <div className="bg-white rounded-xl shadow-sm border p-6">
       <div className="text-center mb-6">
         <h2 className="text-2xl font-black tracking-widest uppercase text-gray-900">Performance SDR</h2>
-        <p className="text-sm font-semibold tracking-widest uppercase text-gray-500 mt-1">Karrao Multimarcas</p>
+        <p className="text-sm font-semibold tracking-widest uppercase text-gray-500 mt-1">Karrão Prime</p>
       </div>
 
       <div className="space-y-4">
@@ -117,6 +129,7 @@ function SdrFunnelTable({ stats }: { stats: SdrStats[] }) {
 
 export default function HistoricoVisitasPage() {
   const router = useRouter()
+  const currentMonthRange = getCurrentMonthDateRange()
   const [historico, setHistorico] = useState<Agendamento[]>([])
   const [filteredHistorico, setFilteredHistorico] = useState<Agendamento[]>([])
   const [vendedores, setVendedores] = useState<Vendedor[]>([])
@@ -134,8 +147,8 @@ export default function HistoricoVisitasPage() {
     status: "",
     realizouVisita: "",
     ganho: "",
-    dataInicio: "",
-    dataFim: "",
+    dataInicio: currentMonthRange.dataInicio,
+    dataFim: currentMonthRange.dataFim,
   })
 
   const currentUser = getCurrentUser()
@@ -228,8 +241,8 @@ export default function HistoricoVisitasPage() {
       status: "",
       realizouVisita: "",
       ganho: "",
-      dataInicio: "",
-      dataFim: "",
+      dataInicio: currentMonthRange.dataInicio,
+      dataFim: currentMonthRange.dataFim,
     })
     setTimeout(() => loadData(1), 0)
   }

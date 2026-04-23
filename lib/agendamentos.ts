@@ -741,6 +741,7 @@ export async function getSdrPerformanceStats(idEmpresa: number): Promise<SdrStat
 
   const now = new Date()
   const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+  const firstOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString()
 
   // Only real SDRs from AUTORIZAÇÃO table
   const { data: sdrsData } = await supabase
@@ -766,6 +767,7 @@ export async function getSdrPerformanceStats(idEmpresa: number): Promise<SdrStat
     .eq("id_empresa", idEmpresa)
     .not("sdr_responsavel", "is", null)
     .gte("created_at", firstOfMonth)
+    .lt("created_at", firstOfNextMonth)
 
   if (sdrFilter) leadsQuery = leadsQuery.eq("sdr_responsavel", sdrFilter)
 
@@ -779,10 +781,11 @@ export async function getSdrPerformanceStats(idEmpresa: number): Promise<SdrStat
   // Agendamentos por SDR (mês atual)
   let agQuery = supabase
     .from("AGENDAMENTOS")
-    .select("sdr_responsavel, estagio_agendamento")
+    .select("sdr_responsavel")
     .eq("id_empresa", idEmpresa)
     .not("sdr_responsavel", "is", null)
     .gte("created_at", firstOfMonth)
+    .lt("created_at", firstOfNextMonth)
 
   if (sdrFilter) agQuery = agQuery.eq("sdr_responsavel", sdrFilter)
 
@@ -791,10 +794,28 @@ export async function getSdrPerformanceStats(idEmpresa: number): Promise<SdrStat
   for (const row of agData || []) {
     const sdr = row.sdr_responsavel as string
     if (!statsMap[sdr]) continue
+    statsMap[sdr].agendamentos++
+  }
+
+  // Visitas e sucessos do mês atual, considerando a movimentação ocorrida no mês
+  let visitasQuery = supabase
+    .from("AGENDAMENTOS")
+    .select("sdr_responsavel, estagio_agendamento")
+    .eq("id_empresa", idEmpresa)
+    .not("sdr_responsavel", "is", null)
+    .gte("updated_at", firstOfMonth)
+    .lt("updated_at", firstOfNextMonth)
+    .in("estagio_agendamento", ["visita_realizada", "sucesso", "insucesso"])
+
+  if (sdrFilter) visitasQuery = visitasQuery.eq("sdr_responsavel", sdrFilter)
+
+  const { data: visitasData } = await visitasQuery
+
+  for (const row of visitasData || []) {
+    const sdr = row.sdr_responsavel as string
+    if (!statsMap[sdr]) continue
 
     const estagio = normalizeAgendamentoStage(row.estagio_agendamento)
-    statsMap[sdr].agendamentos++
-
     if (["visita_realizada", "sucesso", "insucesso"].includes(estagio)) {
       statsMap[sdr].visitas++
     }
