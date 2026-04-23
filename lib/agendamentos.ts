@@ -762,107 +762,125 @@ export async function getSdrPerformanceStats(idEmpresa: number): Promise<SdrStat
 
   const sdrFilter = user?.cargo === "sdr" ? user.nome_usuario : null
 
-  async function fetchAllRows<T>(
-    table: string,
-    selectClause: string,
-    applyFilters: (query: any) => any,
-  ): Promise<T[]> {
-    const allRows: T[] = []
-    let from = 0
-
-    while (true) {
-      const to = from + DASHBOARD_BATCH_SIZE - 1
-      let query = supabase.from(table).select(selectClause)
-      query = applyFilters(query).range(from, to)
-
-      const { data, error } = await query
-
-      if (error) {
-        throw error
-      }
-
-      if (!data || data.length === 0) {
-        break
-      }
-
-      allRows.push(...data)
-
-      if (data.length < DASHBOARD_BATCH_SIZE) {
-        break
-      }
-
-      from += DASHBOARD_BATCH_SIZE
-    }
-
-    return allRows
-  }
-
   // Leads por SDR (mês atual)
-  const leadsData = await fetchAllRows<{ sdr_responsavel: string }>("BASE_DE_LEADS", "sdr_responsavel", (query) => {
-    let filteredQuery = query
+  let leadsFrom = 0
+  while (true) {
+    const leadsTo = leadsFrom + DASHBOARD_BATCH_SIZE - 1
+    let leadsQuery = supabase
+      .from("BASE_DE_LEADS")
+      .select("sdr_responsavel")
       .eq("id_empresa", idEmpresa)
       .not("sdr_responsavel", "is", null)
       .gte("created_at", firstOfMonth)
       .lt("created_at", firstOfNextMonth)
+      .range(leadsFrom, leadsTo)
 
-    if (sdrFilter) filteredQuery = filteredQuery.eq("sdr_responsavel", sdrFilter)
+    if (sdrFilter) leadsQuery = leadsQuery.eq("sdr_responsavel", sdrFilter)
 
-    return filteredQuery
-  })
+    const { data: leadsData, error: leadsError } = await leadsQuery
 
-  for (const row of leadsData) {
-    const sdr = row.sdr_responsavel as string
-    if (statsMap[sdr]) statsMap[sdr].leads++
+    if (leadsError) {
+      throw leadsError
+    }
+
+    if (!leadsData || leadsData.length === 0) {
+      break
+    }
+
+    for (const row of leadsData) {
+      const sdr = row.sdr_responsavel as string
+      if (statsMap[sdr]) statsMap[sdr].leads++
+    }
+
+    if (leadsData.length < DASHBOARD_BATCH_SIZE) {
+      break
+    }
+
+    leadsFrom += DASHBOARD_BATCH_SIZE
   }
 
   // Agendamentos por SDR (mês atual)
-  const agData = await fetchAllRows<{ sdr_responsavel: string }>("AGENDAMENTOS", "sdr_responsavel", (query) => {
-    let filteredQuery = query
+  let agFrom = 0
+  while (true) {
+    const agTo = agFrom + DASHBOARD_BATCH_SIZE - 1
+    let agQuery = supabase
+      .from("AGENDAMENTOS")
+      .select("sdr_responsavel")
       .eq("id_empresa", idEmpresa)
       .not("sdr_responsavel", "is", null)
       .gte("created_at", firstOfMonth)
       .lt("created_at", firstOfNextMonth)
+      .range(agFrom, agTo)
 
-    if (sdrFilter) filteredQuery = filteredQuery.eq("sdr_responsavel", sdrFilter)
+    if (sdrFilter) agQuery = agQuery.eq("sdr_responsavel", sdrFilter)
 
-    return filteredQuery
-  })
+    const { data: agData, error: agError } = await agQuery
 
-  for (const row of agData) {
-    const sdr = row.sdr_responsavel as string
-    if (!statsMap[sdr]) continue
-    statsMap[sdr].agendamentos++
+    if (agError) {
+      throw agError
+    }
+
+    if (!agData || agData.length === 0) {
+      break
+    }
+
+    for (const row of agData) {
+      const sdr = row.sdr_responsavel as string
+      if (!statsMap[sdr]) continue
+      statsMap[sdr].agendamentos++
+    }
+
+    if (agData.length < DASHBOARD_BATCH_SIZE) {
+      break
+    }
+
+    agFrom += DASHBOARD_BATCH_SIZE
   }
 
   // Visitas e sucessos do mês atual, considerando a movimentação ocorrida no mês
-  const visitasData = await fetchAllRows<{ sdr_responsavel: string; estagio_agendamento: string }>(
-    "AGENDAMENTOS",
-    "sdr_responsavel, estagio_agendamento",
-    (query) => {
-      let filteredQuery = query
-        .eq("id_empresa", idEmpresa)
-        .not("sdr_responsavel", "is", null)
-        .gte("updated_at", firstOfMonth)
-        .lt("updated_at", firstOfNextMonth)
-        .in("estagio_agendamento", ["visita_realizada", "sucesso", "insucesso"])
+  let visitasFrom = 0
+  while (true) {
+    const visitasTo = visitasFrom + DASHBOARD_BATCH_SIZE - 1
+    let visitasQuery = supabase
+      .from("AGENDAMENTOS")
+      .select("sdr_responsavel, estagio_agendamento")
+      .eq("id_empresa", idEmpresa)
+      .not("sdr_responsavel", "is", null)
+      .gte("updated_at", firstOfMonth)
+      .lt("updated_at", firstOfNextMonth)
+      .in("estagio_agendamento", ["visita_realizada", "sucesso", "insucesso"])
+      .range(visitasFrom, visitasTo)
 
-      if (sdrFilter) filteredQuery = filteredQuery.eq("sdr_responsavel", sdrFilter)
+    if (sdrFilter) visitasQuery = visitasQuery.eq("sdr_responsavel", sdrFilter)
 
-      return filteredQuery
-    },
-  )
+    const { data: visitasData, error: visitasError } = await visitasQuery
 
-  for (const row of visitasData) {
-    const sdr = row.sdr_responsavel as string
-    if (!statsMap[sdr]) continue
-
-    const estagio = normalizeAgendamentoStage(row.estagio_agendamento)
-    if (["visita_realizada", "sucesso", "insucesso"].includes(estagio)) {
-      statsMap[sdr].visitas++
+    if (visitasError) {
+      throw visitasError
     }
-    if (estagio === "sucesso") {
-      statsMap[sdr].sucesso++
+
+    if (!visitasData || visitasData.length === 0) {
+      break
     }
+
+    for (const row of visitasData) {
+      const sdr = row.sdr_responsavel as string
+      if (!statsMap[sdr]) continue
+
+      const estagio = normalizeAgendamentoStage(row.estagio_agendamento)
+      if (["visita_realizada", "sucesso", "insucesso"].includes(estagio)) {
+        statsMap[sdr].visitas++
+      }
+      if (estagio === "sucesso") {
+        statsMap[sdr].sucesso++
+      }
+    }
+
+    if (visitasData.length < DASHBOARD_BATCH_SIZE) {
+      break
+    }
+
+    visitasFrom += DASHBOARD_BATCH_SIZE
   }
 
   return Object.values(statsMap).sort((a, b) => a.sdr.localeCompare(b.sdr, "pt-BR"))
