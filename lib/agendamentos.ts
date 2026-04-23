@@ -77,6 +77,8 @@ export const VALID_ESTAGIOS_AGENDAMENTO = [
   "insucesso",
 ]
 
+const DASHBOARD_BATCH_SIZE = 1000
+
 export function formatAgendamentoDate(date?: string) {
   if (!date) return ""
 
@@ -760,58 +762,97 @@ export async function getSdrPerformanceStats(idEmpresa: number): Promise<SdrStat
 
   const sdrFilter = user?.cargo === "sdr" ? user.nome_usuario : null
 
+  async function fetchAllRows<T>(
+    table: string,
+    selectClause: string,
+    applyFilters: (query: any) => any,
+  ): Promise<T[]> {
+    const allRows: T[] = []
+    let from = 0
+
+    while (true) {
+      const to = from + DASHBOARD_BATCH_SIZE - 1
+      let query = supabase.from(table).select(selectClause)
+      query = applyFilters(query).range(from, to)
+
+      const { data, error } = await query
+
+      if (error) {
+        throw error
+      }
+
+      if (!data || data.length === 0) {
+        break
+      }
+
+      allRows.push(...data)
+
+      if (data.length < DASHBOARD_BATCH_SIZE) {
+        break
+      }
+
+      from += DASHBOARD_BATCH_SIZE
+    }
+
+    return allRows
+  }
+
   // Leads por SDR (mês atual)
-  let leadsQuery = supabase
-    .from("BASE_DE_LEADS")
-    .select("sdr_responsavel")
-    .eq("id_empresa", idEmpresa)
-    .not("sdr_responsavel", "is", null)
-    .gte("created_at", firstOfMonth)
-    .lt("created_at", firstOfNextMonth)
+  const leadsData = await fetchAllRows<{ sdr_responsavel: string }>("BASE_DE_LEADS", "sdr_responsavel", (query) => {
+    let filteredQuery = query
+      .eq("id_empresa", idEmpresa)
+      .not("sdr_responsavel", "is", null)
+      .gte("created_at", firstOfMonth)
+      .lt("created_at", firstOfNextMonth)
 
-  if (sdrFilter) leadsQuery = leadsQuery.eq("sdr_responsavel", sdrFilter)
+    if (sdrFilter) filteredQuery = filteredQuery.eq("sdr_responsavel", sdrFilter)
 
-  const { data: leadsData } = await leadsQuery
+    return filteredQuery
+  })
 
-  for (const row of leadsData || []) {
+  for (const row of leadsData) {
     const sdr = row.sdr_responsavel as string
     if (statsMap[sdr]) statsMap[sdr].leads++
   }
 
   // Agendamentos por SDR (mês atual)
-  let agQuery = supabase
-    .from("AGENDAMENTOS")
-    .select("sdr_responsavel")
-    .eq("id_empresa", idEmpresa)
-    .not("sdr_responsavel", "is", null)
-    .gte("created_at", firstOfMonth)
-    .lt("created_at", firstOfNextMonth)
+  const agData = await fetchAllRows<{ sdr_responsavel: string }>("AGENDAMENTOS", "sdr_responsavel", (query) => {
+    let filteredQuery = query
+      .eq("id_empresa", idEmpresa)
+      .not("sdr_responsavel", "is", null)
+      .gte("created_at", firstOfMonth)
+      .lt("created_at", firstOfNextMonth)
 
-  if (sdrFilter) agQuery = agQuery.eq("sdr_responsavel", sdrFilter)
+    if (sdrFilter) filteredQuery = filteredQuery.eq("sdr_responsavel", sdrFilter)
 
-  const { data: agData } = await agQuery
+    return filteredQuery
+  })
 
-  for (const row of agData || []) {
+  for (const row of agData) {
     const sdr = row.sdr_responsavel as string
     if (!statsMap[sdr]) continue
     statsMap[sdr].agendamentos++
   }
 
   // Visitas e sucessos do mês atual, considerando a movimentação ocorrida no mês
-  let visitasQuery = supabase
-    .from("AGENDAMENTOS")
-    .select("sdr_responsavel, estagio_agendamento")
-    .eq("id_empresa", idEmpresa)
-    .not("sdr_responsavel", "is", null)
-    .gte("updated_at", firstOfMonth)
-    .lt("updated_at", firstOfNextMonth)
-    .in("estagio_agendamento", ["visita_realizada", "sucesso", "insucesso"])
+  const visitasData = await fetchAllRows<{ sdr_responsavel: string; estagio_agendamento: string }>(
+    "AGENDAMENTOS",
+    "sdr_responsavel, estagio_agendamento",
+    (query) => {
+      let filteredQuery = query
+        .eq("id_empresa", idEmpresa)
+        .not("sdr_responsavel", "is", null)
+        .gte("updated_at", firstOfMonth)
+        .lt("updated_at", firstOfNextMonth)
+        .in("estagio_agendamento", ["visita_realizada", "sucesso", "insucesso"])
 
-  if (sdrFilter) visitasQuery = visitasQuery.eq("sdr_responsavel", sdrFilter)
+      if (sdrFilter) filteredQuery = filteredQuery.eq("sdr_responsavel", sdrFilter)
 
-  const { data: visitasData } = await visitasQuery
+      return filteredQuery
+    },
+  )
 
-  for (const row of visitasData || []) {
+  for (const row of visitasData) {
     const sdr = row.sdr_responsavel as string
     if (!statsMap[sdr]) continue
 
