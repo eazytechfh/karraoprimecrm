@@ -1358,7 +1358,11 @@ export function AgendamentosKanban() {
                                     </p>
                                   )}
                                   <p className="text-xs text-green-700 mt-2">
-                                    Espelho de "{getStatusLabel(agendamento.__mirrorSourceStage || agendamento.estagio_agendamento)}"
+                                    Espelho de "
+                                    {ESTAGIO_AGENDAMENTO_LABELS[
+                                      (agendamento.__mirrorSourceStage || agendamento.estagio_agendamento) as keyof typeof ESTAGIO_AGENDAMENTO_LABELS
+                                    ] || agendamento.__mirrorSourceStage || agendamento.estagio_agendamento}
+                                    "
                                   </p>
                                 </div>
                               </div>
