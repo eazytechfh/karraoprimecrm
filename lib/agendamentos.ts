@@ -654,7 +654,7 @@ export async function getHistoricoVisitas(
     vendedor?: string
     sdr?: string
     status?: string
-    periodo?: "hoje" | "ultimos7dias"
+    periodo?: "mes" | "hoje" | "ultimos7dias"
   },
   pagination?: { page: number; pageSize: number },
 ): Promise<{ data: Agendamento[]; total: number }> {
@@ -688,7 +688,11 @@ export async function getHistoricoVisitas(
     query = query.eq("estagio_agendamento", normalizeAgendamentoStage(filters.status))
   }
 
-  if (filters?.periodo === "hoje") {
+  if (filters?.periodo === "mes") {
+    const now = new Date()
+    const primeiroDiaDoMes = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+    query = query.gte("updated_at", primeiroDiaDoMes)
+  } else if (filters?.periodo === "hoje") {
     const hoje = new Date().toISOString().split("T")[0]
     query = query.gte("updated_at", hoje)
   } else if (filters?.periodo === "ultimos7dias") {

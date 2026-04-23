@@ -419,6 +419,7 @@ export default function HistoricoVisitasPage() {
                         <SelectValue placeholder="Selecione o período" />
                       </SelectTrigger>
                       <SelectContent>
+                        <SelectItem value="mes">Mês</SelectItem>
                         <SelectItem value="hoje">Hoje</SelectItem>
                         <SelectItem value="ultimos7dias">Últimos 7 dias</SelectItem>
                       </SelectContent>
