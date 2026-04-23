@@ -26,6 +26,14 @@ import { Calendar, Phone, User, Clock, Filter, Download } from "lucide-react"
 
 const PAGE_SIZE = 50
 
+type HistoricoFilterParams = {
+  periodo?: "mes" | "hoje" | "ultimos7dias"
+  vendedor?: string
+  sdr?: string
+  dataInicio?: string
+  dataFim?: string
+}
+
 function getCurrentMonthDateRange() {
   const now = new Date()
   const year = now.getFullYear()
@@ -36,6 +44,30 @@ function getCurrentMonthDateRange() {
     dataInicio: `${year}-${month}-01`,
     dataFim: `${year}-${month}-${day}`,
   }
+}
+
+function formatDateInput(date: Date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, "0")
+  const day = String(date.getDate()).padStart(2, "0")
+  return `${year}-${month}-${day}`
+}
+
+function getQuickPeriodDateRange(periodo: string) {
+  const now = new Date()
+
+  if (periodo === "hoje") {
+    const today = formatDateInput(now)
+    return { dataInicio: today, dataFim: today }
+  }
+
+  if (periodo === "ultimos7dias") {
+    const startDate = new Date(now)
+    startDate.setDate(startDate.getDate() - 6)
+    return { dataInicio: formatDateInput(startDate), dataFim: formatDateInput(now) }
+  }
+
+  return getCurrentMonthDateRange()
 }
 
 function pct(num: number, den: number) {
@@ -153,9 +185,9 @@ export default function HistoricoVisitasPage() {
 
   const currentUser = getCurrentUser()
 
-  const buildFilterParams = () => {
-    const filterParams: Record<string, string> = {}
-    if (filters.periodo) filterParams.periodo = filters.periodo
+  const buildFilterParams = (): HistoricoFilterParams => {
+    const filterParams: HistoricoFilterParams = {}
+    if (filters.periodo) filterParams.periodo = filters.periodo as HistoricoFilterParams["periodo"]
     if (filters.vendedor) filterParams.vendedor = filters.vendedor
     if (filters.sdr) filterParams.sdr = filters.sdr
     if (filters.dataInicio) filterParams.dataInicio = filters.dataInicio
@@ -174,7 +206,7 @@ export default function HistoricoVisitasPage() {
       getHistoricoVisitas(currentUser.id_empresa, filterParams, { page, pageSize: PAGE_SIZE }),
       page === 1 ? getVendedores(currentUser.id_empresa) : Promise.resolve(null),
       page === 1 ? getSdrs(currentUser.id_empresa) : Promise.resolve(null),
-      page === 1 ? getSdrPerformanceStats(currentUser.id_empresa) : Promise.resolve(null),
+      page === 1 ? getSdrPerformanceStats(currentUser.id_empresa, filterParams) : Promise.resolve(null),
     ])
 
     setHistorico(historicoResult.data)
@@ -226,7 +258,18 @@ export default function HistoricoVisitasPage() {
   }
 
   const handleFilterChange = (key: string, value: string) => {
-    setFilters((prev) => ({ ...prev, [key]: value }))
+    setFilters((prev) => {
+      if (key === "periodo") {
+        const range = getQuickPeriodDateRange(value)
+        return { ...prev, periodo: value, dataInicio: range.dataInicio, dataFim: range.dataFim }
+      }
+
+      if (key === "dataInicio" || key === "dataFim") {
+        return { ...prev, [key]: value, periodo: "" }
+      }
+
+      return { ...prev, [key]: value }
+    })
   }
 
   const handleApplyFilters = () => {

@@ -741,13 +741,53 @@ export interface SdrStats {
   sucesso: number
 }
 
-export async function getSdrPerformanceStats(idEmpresa: number): Promise<SdrStats[]> {
-  const supabase = createClient()
-  const user = getCurrentUser()
+interface SdrPerformanceFilters {
+  dataInicio?: string
+  dataFim?: string
+  sdr?: string
+  periodo?: "mes" | "hoje" | "ultimos7dias"
+}
+
+function resolveSdrPerformanceDateRange(filters?: SdrPerformanceFilters) {
+  if (filters?.dataInicio || filters?.dataFim) {
+    const start = filters?.dataInicio ? new Date(`${filters.dataInicio}T00:00:00`).toISOString() : undefined
+    let endExclusive: string | undefined
+
+    if (filters?.dataFim) {
+      const endDate = new Date(`${filters.dataFim}T00:00:00`)
+      endDate.setDate(endDate.getDate() + 1)
+      endExclusive = endDate.toISOString()
+    }
+
+    return { start, endExclusive }
+  }
 
   const now = new Date()
-  const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
-  const firstOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString()
+
+  if (filters?.periodo === "hoje") {
+    return {
+      start: new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString(),
+      endExclusive: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString(),
+    }
+  }
+
+  if (filters?.periodo === "ultimos7dias") {
+    return {
+      start: new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6).toISOString(),
+      endExclusive: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString(),
+    }
+  }
+
+  return {
+    start: new Date(now.getFullYear(), now.getMonth(), 1).toISOString(),
+    endExclusive: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString(),
+  }
+}
+
+export async function getSdrPerformanceStats(idEmpresa: number, filters?: SdrPerformanceFilters): Promise<SdrStats[]> {
+  const supabase = createClient()
+  const user = getCurrentUser()
+  const { start, endExclusive } = resolveSdrPerformanceDateRange(filters)
 
   // Only real SDRs from AUTORIZAÇÃO table
   const { data: sdrsData } = await supabase
@@ -764,7 +804,7 @@ export async function getSdrPerformanceStats(idEmpresa: number): Promise<SdrStat
     statsMap[sdrName] = { sdr: sdrName, leads: 0, agendamentos: 0, visitas: 0, sucesso: 0 }
   }
 
-  const sdrFilter = user?.cargo === "sdr" ? user.nome_usuario : null
+  const sdrFilter = user?.cargo === "sdr" ? user.nome_usuario : filters?.sdr || null
 
   // Leads por SDR (mês atual)
   let leadsFrom = 0
@@ -775,10 +815,10 @@ export async function getSdrPerformanceStats(idEmpresa: number): Promise<SdrStat
       .select("sdr_responsavel")
       .eq("id_empresa", idEmpresa)
       .not("sdr_responsavel", "is", null)
-      .gte("created_at", firstOfMonth)
-      .lt("created_at", firstOfNextMonth)
       .range(leadsFrom, leadsTo)
 
+    if (start) leadsQuery = leadsQuery.gte("created_at", start)
+    if (endExclusive) leadsQuery = leadsQuery.lt("created_at", endExclusive)
     if (sdrFilter) leadsQuery = leadsQuery.eq("sdr_responsavel", sdrFilter)
 
     const { data: leadsData, error: leadsError } = await leadsQuery
@@ -812,10 +852,10 @@ export async function getSdrPerformanceStats(idEmpresa: number): Promise<SdrStat
       .select("sdr_responsavel")
       .eq("id_empresa", idEmpresa)
       .not("sdr_responsavel", "is", null)
-      .gte("created_at", firstOfMonth)
-      .lt("created_at", firstOfNextMonth)
       .range(agFrom, agTo)
 
+    if (start) agQuery = agQuery.gte("created_at", start)
+    if (endExclusive) agQuery = agQuery.lt("created_at", endExclusive)
     if (sdrFilter) agQuery = agQuery.eq("sdr_responsavel", sdrFilter)
 
     const { data: agData, error: agError } = await agQuery
@@ -850,11 +890,11 @@ export async function getSdrPerformanceStats(idEmpresa: number): Promise<SdrStat
       .select("sdr_responsavel, estagio_agendamento")
       .eq("id_empresa", idEmpresa)
       .not("sdr_responsavel", "is", null)
-      .gte("updated_at", firstOfMonth)
-      .lt("updated_at", firstOfNextMonth)
       .in("estagio_agendamento", ["visita_realizada", "sucesso", "insucesso"])
       .range(visitasFrom, visitasTo)
 
+    if (start) visitasQuery = visitasQuery.gte("updated_at", start)
+    if (endExclusive) visitasQuery = visitasQuery.lt("updated_at", endExclusive)
     if (sdrFilter) visitasQuery = visitasQuery.eq("sdr_responsavel", sdrFilter)
 
     const { data: visitasData, error: visitasError } = await visitasQuery
