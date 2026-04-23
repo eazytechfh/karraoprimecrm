@@ -857,15 +857,20 @@ export function AgendamentosKanban() {
     const realizouVisita = filteredAgendamentos.filter(
       (a) => normalizeAgendamentoStage(a.estagio_agendamento) === "visita_realizada",
     )
-    const sucessosEspelho = filteredAgendamentos
+    const espelhosVisitaRealizada = filteredAgendamentos
       .filter((a) => {
-        if (normalizeAgendamentoStage(a.estagio_agendamento) !== "sucesso") return false
+        const estagio = normalizeAgendamentoStage(a.estagio_agendamento)
+        if (!["sucesso", "insucesso"].includes(estagio)) return false
         const flags = parseCheckboxFlagsFromObservacoes(a.observacoes)
-        return flags.ganho && flags.realizouVisita
+        return flags.realizouVisita
       })
-      .map((a) => ({ ...a, __mirrorFromSucesso: true }))
+      .map((a) => ({
+        ...a,
+        __mirrorFromVisitaRealizada: true,
+        __mirrorSourceStage: normalizeAgendamentoStage(a.estagio_agendamento),
+      }))
 
-    return [...realizouVisita, ...sucessosEspelho]
+    return [...realizouVisita, ...espelhosVisitaRealizada]
   }
 
   const formatHistoricoDate = (dateString: string) => {
@@ -1336,9 +1341,9 @@ export function AgendamentosKanban() {
                       <p className="text-sm text-muted-foreground text-center py-4">Nenhum agendamento</p>
                     ) : (
                       agendamentosColuna.map((agendamento: any) =>
-                        agendamento.__mirrorFromSucesso ? (
+                        agendamento.__mirrorFromVisitaRealizada ? (
                           <Card
-                            key={`mirror-sucesso-${agendamento.id}`}
+                            key={`mirror-visita-${agendamento.id}`}
                             className="transition-all duration-200 cursor-pointer border-green-200 bg-green-50/30"
                             onClick={() => handleOpenAgendamento(agendamento)}
                           >
@@ -1352,7 +1357,9 @@ export function AgendamentosKanban() {
                                       {agendamento.telefone}
                                     </p>
                                   )}
-                                  <p className="text-xs text-green-700 mt-2">Espelho de "Sucesso"</p>
+                                  <p className="text-xs text-green-700 mt-2">
+                                    Espelho de "{getStatusLabel(agendamento.__mirrorSourceStage || agendamento.estagio_agendamento)}"
+                                  </p>
                                 </div>
                               </div>
                             </CardHeader>
