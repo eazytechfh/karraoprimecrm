@@ -221,7 +221,7 @@ function DroppableColumn({ stage, children }: { stage: string; children: React.R
   return (
     <div
       ref={setNodeRef}
-      className={`w-80 min-h-[500px] flex-shrink-0 transition-all duration-200 ${
+      className={`min-w-[180px] flex-1 min-h-[500px] transition-all duration-200 ${
         isOver ? "bg-accent/20 rounded-lg" : ""
       }`}
     >
@@ -1206,7 +1206,7 @@ export function AgendamentosKanban() {
   }
 
   return (
-    <div className="container mx-auto p-4 max-w-[1800px] space-y-6">
+    <div className="w-full p-4 space-y-6">
       <Card>
         <CardHeader>
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -1328,7 +1328,7 @@ export function AgendamentosKanban() {
       )}
 
       <DndContext onDragEnd={handleDragEnd}>
-        <div className="flex gap-4 overflow-x-auto pb-4">
+        <div className="flex gap-3 pb-4 overflow-x-auto">
           {COLUNAS_KANBAN_AGENDAMENTOS.map((coluna) => {
             const agendamentosColuna = getAgendamentosByStage(coluna)
             const agendamentosPaged = getPagedAgendamentosByStage(coluna)
@@ -1337,7 +1337,7 @@ export function AgendamentosKanban() {
             return (
               <DroppableColumn key={coluna} stage={coluna}>
                 <Card
-                  className={`flex h-[calc(100vh-16rem)] min-h-[540px] min-w-0 flex-col border-t-4 ${
+                  className={`flex h-[calc(100vh-16rem)] min-h-[540px] w-full flex-col border-t-4 ${
                     COLUNA_TOP_BORDER_COLORS_AGENDAMENTOS[coluna] || "border-t-slate-300"
                   }`}
                 >
