@@ -91,6 +91,7 @@ const MOTIVOS_LEAD = [
   "Outros Motivos",
 ]
 const MOTIVO_PREFIX = "[Motivo] "
+const KANBAN_PAGE_SIZE = 20
 
 export function KanbanBoard() {
   const [leads, setLeads] = useState<Lead[]>([])
@@ -130,6 +131,9 @@ export function KanbanBoard() {
   const [leadLatestHistory, setLeadLatestHistory] = useState<Record<number, LeadHistorico>>({})
   const [selectedLeadHistory, setSelectedLeadHistory] = useState<LeadHistorico[]>([])
   const [loadingLeadHistory, setLoadingLeadHistory] = useState(false)
+  const [kanbanPages, setKanbanPages] = useState<Record<string, number>>(
+    Object.fromEntries(COLUNAS_KANBAN.map((s) => [s, 1]))
+  )
 
   const extractMotivo = (observacao?: string) => {
     if (!observacao) return ""
@@ -163,6 +167,7 @@ export function KanbanBoard() {
 
   useEffect(() => {
     filterLeads()
+    setKanbanPages(Object.fromEntries(COLUNAS_KANBAN.map((s) => [s, 1])))
   }, [leads, searchTerm, filterOrigem, filterEstagio, filterSdr])
 
   useEffect(() => {
@@ -536,6 +541,22 @@ export function KanbanBoard() {
   const getStageTotal = (stage: string) => {
     const stageLeads = getLeadsByStage(stage)
     return stageLeads.reduce((total, lead) => total + (lead.valor || 0), 0)
+  }
+
+  const getPagedLeadsByStage = (stage: string) => {
+    const all = getLeadsByStage(stage)
+    const page = kanbanPages[stage] || 1
+    return all.slice(0, page * KANBAN_PAGE_SIZE)
+  }
+
+  const hasMoreLeads = (stage: string) => {
+    const all = getLeadsByStage(stage)
+    const page = kanbanPages[stage] || 1
+    return all.length > page * KANBAN_PAGE_SIZE
+  }
+
+  const loadMoreLeads = (stage: string) => {
+    setKanbanPages((prev) => ({ ...prev, [stage]: (prev[stage] || 1) + 1 }))
   }
 
   const getEtiquetasDoLead = (leadId: number) => leadEtiquetas[leadId] || []
@@ -1256,7 +1277,7 @@ export function KanbanBoard() {
                           {...provided.droppableProps}
                           className="space-y-2 flex-1 overflow-y-auto pr-2 scrollbar-thin"
                         >
-                          {getLeadsByStage(stage).map((lead, index) => (
+                          {getPagedLeadsByStage(stage).map((lead, index) => (
                             <Draggable key={lead.id} draggableId={lead.id.toString()} index={index}>
                               {(provided, snapshot) => (
                                 <Card
@@ -1384,6 +1405,16 @@ export function KanbanBoard() {
                               <div className="text-xs">Nenhum lead neste estágio</div>
                               <div className="text-xs mt-1">Arraste leads aqui</div>
                             </div>
+                          )}
+
+                          {/* Botão carregar mais */}
+                          {hasMoreLeads(stage) && (
+                            <button
+                              onClick={() => loadMoreLeads(stage)}
+                              className="w-full mt-1 py-2 text-xs text-gray-500 hover:text-gray-700 border border-dashed border-gray-300 hover:border-gray-400 rounded-lg transition-colors"
+                            >
+                              Carregar mais ({getLeadsByStage(stage).length - (kanbanPages[stage] || 1) * KANBAN_PAGE_SIZE} restantes)
+                            </button>
                           )}
                         </CardContent>
                       </Card>
