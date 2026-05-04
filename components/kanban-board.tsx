@@ -1411,7 +1411,7 @@ export function KanbanBoard() {
                           {hasMoreLeads(stage) && (
                             <button
                               onClick={() => loadMoreLeads(stage)}
-                              className="w-full mt-1 py-2 text-xs text-gray-500 hover:text-gray-700 border border-dashed border-gray-300 hover:border-gray-400 rounded-lg transition-colors"
+                              className="w-full mt-1 py-2 text-xs text-blue-500 hover:text-blue-700 border border-dashed border-blue-300 hover:border-blue-500 rounded-lg transition-colors"
                             >
                               Carregar mais ({getLeadsByStage(stage).length - (kanbanPages[stage] || 1) * KANBAN_PAGE_SIZE} restantes)
                             </button>
