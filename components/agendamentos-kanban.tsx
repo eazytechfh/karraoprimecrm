@@ -78,6 +78,7 @@ const COLUNA_TOP_BORDER_COLORS_AGENDAMENTOS: Record<string, string> = {
   sucesso: "border-t-green-600",
   insucesso: "border-t-red-500",
 }
+const KANBAN_PAGE_SIZE = 20
 const CHECKBOX_FLAGS_PREFIX = "__flags__:"
 
 function parseCheckboxFlagsFromObservacoes(observacoes?: string) {
@@ -284,6 +285,9 @@ export function AgendamentosKanban() {
 
   const [showNaoRealizouModal, setShowNaoRealizouModal] = useState(false)
   const [agendamentoParaNaoRealizou, setAgendamentoParaNaoRealizou] = useState<Agendamento | null>(null)
+  const [kanbanPages, setKanbanPages] = useState<Record<string, number>>(
+    Object.fromEntries(COLUNAS_KANBAN_AGENDAMENTOS.map((s) => [s, 1]))
+  )
 
   const userCanEdit = canEditCards(currentUser)
   const isVendedor = currentUser?.cargo?.toLowerCase() === "vendedor"
@@ -873,6 +877,22 @@ export function AgendamentosKanban() {
     return [...realizouVisita, ...espelhosVisitaRealizada]
   }
 
+  const getPagedAgendamentosByStage = (stage: string) => {
+    const all = getAgendamentosByStage(stage)
+    const page = kanbanPages[stage] || 1
+    return all.slice(0, page * KANBAN_PAGE_SIZE)
+  }
+
+  const hasMoreAgendamentos = (stage: string) => {
+    const all = getAgendamentosByStage(stage)
+    const page = kanbanPages[stage] || 1
+    return all.length > page * KANBAN_PAGE_SIZE
+  }
+
+  const loadMoreAgendamentos = (stage: string) => {
+    setKanbanPages((prev) => ({ ...prev, [stage]: (prev[stage] || 1) + 1 }))
+  }
+
   const formatHistoricoDate = (dateString: string) => {
     const date = new Date(dateString)
     return date.toLocaleString("pt-BR", {
@@ -1154,6 +1174,7 @@ export function AgendamentosKanban() {
 
   useEffect(() => {
     filterAgendamentos()
+    setKanbanPages(Object.fromEntries(COLUNAS_KANBAN_AGENDAMENTOS.map((s) => [s, 1])))
   }, [
     agendamentos,
     searchTerm,
@@ -1310,6 +1331,7 @@ export function AgendamentosKanban() {
         <div className="flex gap-4 overflow-x-auto pb-4">
           {COLUNAS_KANBAN_AGENDAMENTOS.map((coluna) => {
             const agendamentosColuna = getAgendamentosByStage(coluna)
+            const agendamentosPaged = getPagedAgendamentosByStage(coluna)
             const total = agendamentosColuna.reduce((sum, a) => sum + Number(a.valor_venda || 0), 0)
 
             return (
@@ -1340,7 +1362,7 @@ export function AgendamentosKanban() {
                     {agendamentosColuna.length === 0 ? (
                       <p className="text-sm text-muted-foreground text-center py-4">Nenhum agendamento</p>
                     ) : (
-                      agendamentosColuna.map((agendamento: any) =>
+                      agendamentosPaged.map((agendamento: any) =>
                         agendamento.__mirrorFromVisitaRealizada ? (
                           <Card
                             key={`mirror-visita-${agendamento.id}`}
@@ -1380,6 +1402,14 @@ export function AgendamentosKanban() {
                           />
                         ),
                       )
+                    )}
+                    {hasMoreAgendamentos(coluna) && (
+                      <button
+                        onClick={() => loadMoreAgendamentos(coluna)}
+                        className="w-full mt-1 py-2 text-xs text-blue-500 hover:text-blue-700 border border-dashed border-blue-300 hover:border-blue-500 rounded-lg transition-colors"
+                      >
+                        Carregar mais ({agendamentosColuna.length - (kanbanPages[coluna] || 1) * KANBAN_PAGE_SIZE} restantes)
+                      </button>
                     )}
                   </CardContent>
                 </Card>
