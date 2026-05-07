@@ -91,3 +91,20 @@
 .gradient-light {
   background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
 }
+
+/* Deixa a tela de Negociações com a mesma densidade visual do zoom 50% mesmo usando 67%. */
+.negociacoes-scale-root {
+  --negociacoes-scale: 0.75;
+  width: calc(100vw / var(--negociacoes-scale));
+  height: calc(100vh / var(--negociacoes-scale));
+  transform: scale(var(--negociacoes-scale));
+  transform-origin: top left;
+}
+
+@media (max-width: 900px) {
+  .negociacoes-scale-root {
+    --negociacoes-scale: 1;
+    width: 100vw;
+    height: 100vh;
+  }
+}

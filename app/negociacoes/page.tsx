@@ -17,7 +17,7 @@ export default function Negociacoes() {
   }, [router])
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="negociacoes-scale-root flex bg-gray-50">
       <SidebarNav />
 
       <div className="flex-1 flex flex-col overflow-hidden lg:ml-0">
