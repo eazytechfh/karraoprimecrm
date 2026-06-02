@@ -102,6 +102,9 @@ export function KanbanBoard() {
   const [filterOrigem, setFilterOrigem] = useState("")
   const [filterEstagio, setFilterEstagio] = useState("")
   const [filterSdr, setFilterSdr] = useState("")
+  const [filterDataInicio, setFilterDataInicio] = useState("")
+  const [filterDataFim, setFilterDataFim] = useState("")
+  const [filterEtiqueta, setFilterEtiqueta] = useState("")
   const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban")
   const [generatingResumo, setGeneratingResumo] = useState(false)
   const [resumoMessage, setResumoMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
@@ -168,7 +171,7 @@ export function KanbanBoard() {
   useEffect(() => {
     filterLeads()
     setKanbanPages(Object.fromEntries(COLUNAS_KANBAN.map((s) => [s, 1])))
-  }, [leads, searchTerm, filterOrigem, filterEstagio, filterSdr])
+  }, [leads, searchTerm, filterOrigem, filterEstagio, filterSdr, filterDataInicio, filterDataFim, filterEtiqueta, leadEtiquetas])
 
   useEffect(() => {
     setSelectedMotivo(extractMotivo(selectedLead?.observacao_vendedor))
@@ -296,6 +299,26 @@ export function KanbanBoard() {
 
     if (filterSdr && filterSdr !== "all") {
       filtered = filtered.filter((lead) => lead.sdr_responsavel === filterSdr)
+    }
+
+    if (filterDataInicio) {
+      filtered = filtered.filter((lead) => {
+        const leadDate = new Date(lead.created_at).toISOString().split("T")[0]
+        return leadDate >= filterDataInicio
+      })
+    }
+
+    if (filterDataFim) {
+      filtered = filtered.filter((lead) => {
+        const leadDate = new Date(lead.created_at).toISOString().split("T")[0]
+        return leadDate <= filterDataFim
+      })
+    }
+
+    if (filterEtiqueta && filterEtiqueta !== "all") {
+      filtered = filtered.filter((lead) =>
+        (leadEtiquetas[lead.id] || []).some((etiqueta) => etiqueta.id === filterEtiqueta),
+      )
     }
 
     setFilteredLeads(filtered)
@@ -1175,7 +1198,12 @@ export function KanbanBoard() {
       )}
 
       {viewMode === "list" ? (
-        <LeadsListView leads={leads} onLeadsUpdate={handleLeadsUpdate} />
+        <LeadsListView
+          leads={leads}
+          onLeadsUpdate={handleLeadsUpdate}
+          etiquetasDisponiveis={etiquetasDisponiveis}
+          leadEtiquetas={leadEtiquetas}
+        />
       ) : (
         <>
           {/* Filtros */}
@@ -1238,6 +1266,24 @@ export function KanbanBoard() {
                       </option>
                     ))}
                   </select>
+                </div>
+                <div>
+                  <select value={filterEtiqueta} onChange={(e) => setFilterEtiqueta(e.target.value)}>
+                    <option value="all">Todas as etiquetas</option>
+                    {etiquetasDisponiveis.map((etiqueta) => (
+                      <option key={etiqueta.id} value={etiqueta.id}>
+                        {etiqueta.nome}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">Data Inicio</label>
+                  <Input type="date" value={filterDataInicio} onChange={(e) => setFilterDataInicio(e.target.value)} />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">Data Fim</label>
+                  <Input type="date" value={filterDataFim} onChange={(e) => setFilterDataFim(e.target.value)} />
                 </div>
               </div>
             </CardContent>

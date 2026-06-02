@@ -32,16 +32,24 @@ import { SendMessageModal } from "./send-message-modal"
 import { formatLeadHistoryDate, getLeadHistory, type LeadHistorico } from "@/lib/lead-history"
 import { getCurrentUser } from "@/lib/auth"
 import { getSdrs } from "@/lib/agendamentos"
+import type { Etiqueta } from "@/lib/etiquetas"
 import { Filter, Search, ChevronDown, Trash2, Send, MessageSquare, Phone, Mail, Move, User } from "lucide-react"
 
 interface LeadsListViewProps {
   leads: Lead[]
   onLeadsUpdate: () => void
+  etiquetasDisponiveis?: Etiqueta[]
+  leadEtiquetas?: Record<number, Etiqueta[]>
 }
 
 const PAGE_SIZE = 50
 
-export function LeadsListView({ leads, onLeadsUpdate }: LeadsListViewProps) {
+export function LeadsListView({
+  leads,
+  onLeadsUpdate,
+  etiquetasDisponiveis = [],
+  leadEtiquetas = {},
+}: LeadsListViewProps) {
   const [filteredLeads, setFilteredLeads] = useState<Lead[]>(leads)
   const [currentPage, setCurrentPage] = useState(1)
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
@@ -52,6 +60,7 @@ export function LeadsListView({ leads, onLeadsUpdate }: LeadsListViewProps) {
   const [filterDataInicio, setFilterDataInicio] = useState("")
   const [filterDataFim, setFilterDataFim] = useState("")
   const [filterVeiculo, setFilterVeiculo] = useState("")
+  const [filterEtiqueta, setFilterEtiqueta] = useState("")
   const [selectedLeadIds, setSelectedLeadIds] = useState<number[]>([])
   const [showMessageModal, setShowMessageModal] = useState(false)
   const [actionMessage, setActionMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
@@ -75,7 +84,18 @@ export function LeadsListView({ leads, onLeadsUpdate }: LeadsListViewProps) {
   useEffect(() => {
     filterLeads()
     setCurrentPage(1)
-  }, [leads, searchTerm, filterOrigem, filterEstagio, filterSdr, filterDataInicio, filterDataFim, filterVeiculo])
+  }, [
+    leads,
+    searchTerm,
+    filterOrigem,
+    filterEstagio,
+    filterSdr,
+    filterDataInicio,
+    filterDataFim,
+    filterVeiculo,
+    filterEtiqueta,
+    leadEtiquetas,
+  ])
 
   useEffect(() => {
     setSelectedLeadIds([])
@@ -138,6 +158,12 @@ export function LeadsListView({ leads, onLeadsUpdate }: LeadsListViewProps) {
 
     if (filterVeiculo && filterVeiculo !== "all") {
       filtered = filtered.filter((lead) => lead.veiculo_interesse?.toLowerCase().includes(filterVeiculo.toLowerCase()))
+    }
+
+    if (filterEtiqueta && filterEtiqueta !== "all") {
+      filtered = filtered.filter((lead) =>
+        (leadEtiquetas[lead.id] || []).some((etiqueta) => etiqueta.id === filterEtiqueta),
+      )
     }
 
     setFilteredLeads(filtered)
@@ -519,6 +545,19 @@ export function LeadsListView({ leads, onLeadsUpdate }: LeadsListViewProps) {
                 {veiculos.map((veiculo) => (
                   <SelectItem key={veiculo} value={veiculo!}>
                     {veiculo}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={filterEtiqueta} onValueChange={setFilterEtiqueta}>
+              <SelectTrigger>
+                <SelectValue placeholder="Filtrar por etiqueta" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas as etiquetas</SelectItem>
+                {etiquetasDisponiveis.map((etiqueta) => (
+                  <SelectItem key={etiqueta.id} value={etiqueta.id}>
+                    {etiqueta.nome}
                   </SelectItem>
                 ))}
               </SelectContent>
