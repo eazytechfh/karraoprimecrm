@@ -804,6 +804,12 @@ export function KanbanBoard() {
       if (!motivoSalvo) {
         throw new Error("Não foi possível salvar o motivo no lead.")
       }
+      const leadMovidoParaResgate = await updateLeadStage(selectedLead.id, "resgate")
+
+      if (!leadMovidoParaResgate) {
+        throw new Error("Nao foi possivel mover o lead para resgate.")
+      }
+
 
       const { data: agendamentoExistente, error: fetchError } = await supabase
         .from("AGENDAMENTOS")
@@ -877,7 +883,7 @@ export function KanbanBoard() {
 
       toast({
         title: "Lead finalizado",
-        description: "O lead foi enviado para Agendamentos na etapa Insucesso.",
+        description: "O lead foi enviado para Resgate e o agendamento foi marcado como Insucesso.",
       })
     } catch (error) {
       console.error("[v0] Error finalizing lead:", error)
