@@ -487,11 +487,12 @@ export function LeadsListView({
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
             <div className="relative">
               <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
               <Input
-                placeholder="Buscar por nome, telefone, vendedor ou SDR..."
+                placeholder="Buscar por nome, telefone, vendedor..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
@@ -502,7 +503,7 @@ export function LeadsListView({
                 <SelectValue placeholder="Filtrar por origem" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todas as origens</SelectItem>
+                <SelectItem value="all">Filtrar por origem</SelectItem>
                 {origens.map((origem) => (
                   <SelectItem key={origem} value={origem!}>
                     {origem}
@@ -515,7 +516,7 @@ export function LeadsListView({
                 <SelectValue placeholder="Filtrar por estágio" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todos os estágios</SelectItem>
+                <SelectItem value="all">Filtrar por estagio</SelectItem>
                 {Object.entries(ESTAGIO_LABELS).map(([key, label]) => (
                   <SelectItem key={key} value={key}>
                     {label}
@@ -528,7 +529,7 @@ export function LeadsListView({
                 <SelectValue placeholder="Filtrar por SDR" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todos os SDRs</SelectItem>
+                <SelectItem value="all">Filtrar por SDR</SelectItem>
                 {realSdrs.map((sdr) => (
                   <SelectItem key={sdr} value={sdr}>
                     {sdr}
@@ -536,12 +537,14 @@ export function LeadsListView({
                 ))}
               </SelectContent>
             </Select>
+            </div>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
             <Select value={filterVeiculo} onValueChange={setFilterVeiculo}>
               <SelectTrigger>
                 <SelectValue placeholder="Filtrar por veículo" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todos os veículos</SelectItem>
+                <SelectItem value="all">Filtrar por veiculo</SelectItem>
                 {veiculos.map((veiculo) => (
                   <SelectItem key={veiculo} value={veiculo!}>
                     {veiculo}
@@ -554,7 +557,7 @@ export function LeadsListView({
                 <SelectValue placeholder="Filtrar por etiqueta" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todas as etiquetas</SelectItem>
+                <SelectItem value="all">Filtrar por etiqueta</SelectItem>
                 {etiquetasDisponiveis.map((etiqueta) => (
                   <SelectItem key={etiqueta.id} value={etiqueta.id}>
                     {etiqueta.nome}
@@ -569,6 +572,7 @@ export function LeadsListView({
             <div>
               <label className="text-xs text-gray-500 mb-1 block">Data Fim</label>
               <Input type="date" value={filterDataFim} onChange={(e) => setFilterDataFim(e.target.value)} />
+            </div>
             </div>
           </div>
         </CardContent>

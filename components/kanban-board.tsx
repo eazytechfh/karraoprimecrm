@@ -104,6 +104,7 @@ export function KanbanBoard() {
   const [filterSdr, setFilterSdr] = useState("")
   const [filterDataInicio, setFilterDataInicio] = useState("")
   const [filterDataFim, setFilterDataFim] = useState("")
+  const [filterVeiculo, setFilterVeiculo] = useState("")
   const [filterEtiqueta, setFilterEtiqueta] = useState("")
   const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban")
   const [generatingResumo, setGeneratingResumo] = useState(false)
@@ -171,7 +172,18 @@ export function KanbanBoard() {
   useEffect(() => {
     filterLeads()
     setKanbanPages(Object.fromEntries(COLUNAS_KANBAN.map((s) => [s, 1])))
-  }, [leads, searchTerm, filterOrigem, filterEstagio, filterSdr, filterDataInicio, filterDataFim, filterEtiqueta, leadEtiquetas])
+  }, [
+    leads,
+    searchTerm,
+    filterOrigem,
+    filterEstagio,
+    filterSdr,
+    filterDataInicio,
+    filterDataFim,
+    filterVeiculo,
+    filterEtiqueta,
+    leadEtiquetas,
+  ])
 
   useEffect(() => {
     setSelectedMotivo(extractMotivo(selectedLead?.observacao_vendedor))
@@ -313,6 +325,10 @@ export function KanbanBoard() {
         const leadDate = new Date(lead.created_at).toISOString().split("T")[0]
         return leadDate <= filterDataFim
       })
+    }
+
+    if (filterVeiculo && filterVeiculo !== "all") {
+      filtered = filtered.filter((lead) => lead.veiculo_interesse?.toLowerCase().includes(filterVeiculo.toLowerCase()))
     }
 
     if (filterEtiqueta && filterEtiqueta !== "all") {
@@ -628,6 +644,7 @@ export function KanbanBoard() {
   }
 
   const origens = [...new Set(leads.map((lead) => lead.origem).filter(Boolean))]
+  const veiculos = [...new Set(leads.map((lead) => lead.veiculo_interesse).filter(Boolean))]
 
   const handleLeadsUpdate = () => {
     loadLeads()
@@ -1227,63 +1244,77 @@ export function KanbanBoard() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-                <div className="relative">
-                  <Phone className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                  <input
-                    placeholder="Buscar por nome, telefone, vendedor ou SDR..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
-                  />
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                    <input
+                      placeholder="Buscar por nome, telefone, vendedor..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                  <div>
+                    <select value={filterOrigem} onChange={(e) => setFilterOrigem(e.target.value)}>
+                      <option value="all">Filtrar por origem</option>
+                      {origens.map((origem) => (
+                        <option key={origem} value={origem!}>
+                          {origem}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <select value={filterEstagio} onChange={(e) => setFilterEstagio(e.target.value)}>
+                      <option value="all">Filtrar por estagio</option>
+                      {Object.entries(ESTAGIO_LABELS).map(([key, label]) => (
+                        <option key={key} value={key}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <select value={filterSdr} onChange={(e) => setFilterSdr(e.target.value)}>
+                      <option value="all">Filtrar por SDR</option>
+                      {realSdrList.map((sdr) => (
+                        <option key={sdr} value={sdr}>
+                          {sdr}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
-                <div>
-                  <select value={filterOrigem} onChange={(e) => setFilterOrigem(e.target.value)}>
-                    <option value="all">Todas as origens</option>
-                    {origens.map((origem) => (
-                      <option key={origem} value={origem!}>
-                        {origem}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <select value={filterEstagio} onChange={(e) => setFilterEstagio(e.target.value)}>
-                    <option value="all">Todos os estágios</option>
-                    {Object.entries(ESTAGIO_LABELS).map(([key, label]) => (
-                      <option key={key} value={key}>
-                        {label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <select value={filterSdr} onChange={(e) => setFilterSdr(e.target.value)}>
-                    <option value="all">Todos os SDRs</option>
-                    {realSdrList.map((sdr) => (
-                      <option key={sdr} value={sdr}>
-                        {sdr}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <select value={filterEtiqueta} onChange={(e) => setFilterEtiqueta(e.target.value)}>
-                    <option value="all">Todas as etiquetas</option>
-                    {etiquetasDisponiveis.map((etiqueta) => (
-                      <option key={etiqueta.id} value={etiqueta.id}>
-                        {etiqueta.nome}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs text-gray-500 mb-1 block">Data Inicio</label>
-                  <Input type="date" value={filterDataInicio} onChange={(e) => setFilterDataInicio(e.target.value)} />
-                </div>
-                <div>
-                  <label className="text-xs text-gray-500 mb-1 block">Data Fim</label>
-                  <Input type="date" value={filterDataFim} onChange={(e) => setFilterDataFim(e.target.value)} />
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                  <div>
+                    <select value={filterVeiculo} onChange={(e) => setFilterVeiculo(e.target.value)}>
+                      <option value="all">Filtrar por veiculo</option>
+                      {veiculos.map((veiculo) => (
+                        <option key={veiculo} value={veiculo!}>
+                          {veiculo}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <select value={filterEtiqueta} onChange={(e) => setFilterEtiqueta(e.target.value)}>
+                      <option value="all">Filtrar por etiqueta</option>
+                      {etiquetasDisponiveis.map((etiqueta) => (
+                        <option key={etiqueta.id} value={etiqueta.id}>
+                          {etiqueta.nome}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">Data Inicio</label>
+                    <Input type="date" value={filterDataInicio} onChange={(e) => setFilterDataInicio(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">Data Fim</label>
+                    <Input type="date" value={filterDataFim} onChange={(e) => setFilterDataFim(e.target.value)} />
+                  </div>
                 </div>
               </div>
             </CardContent>
