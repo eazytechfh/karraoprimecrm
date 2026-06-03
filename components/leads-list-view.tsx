@@ -539,6 +539,7 @@ export function LeadsListView({
             </Select>
             </div>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div className="pt-5">
             <Select value={filterVeiculo} onValueChange={setFilterVeiculo}>
               <SelectTrigger>
                 <SelectValue placeholder="Filtrar por veículo" />
@@ -552,6 +553,8 @@ export function LeadsListView({
                 ))}
               </SelectContent>
             </Select>
+            </div>
+            <div className="pt-5">
             <Select value={filterEtiqueta} onValueChange={setFilterEtiqueta}>
               <SelectTrigger>
                 <SelectValue placeholder="Filtrar por etiqueta" />
@@ -565,6 +568,7 @@ export function LeadsListView({
                 ))}
               </SelectContent>
             </Select>
+            </div>
             <div>
               <label className="text-xs text-gray-500 mb-1 block">Data Início</label>
               <Input type="date" value={filterDataInicio} onChange={(e) => setFilterDataInicio(e.target.value)} />

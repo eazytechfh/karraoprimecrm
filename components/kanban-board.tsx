@@ -1287,7 +1287,7 @@ export function KanbanBoard() {
                   </div>
                 </div>
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-                  <div>
+                  <div className="pt-5">
                     <select value={filterVeiculo} onChange={(e) => setFilterVeiculo(e.target.value)}>
                       <option value="all">Filtrar por veiculo</option>
                       {veiculos.map((veiculo) => (
@@ -1297,7 +1297,7 @@ export function KanbanBoard() {
                       ))}
                     </select>
                   </div>
-                  <div>
+                  <div className="pt-5">
                     <select value={filterEtiqueta} onChange={(e) => setFilterEtiqueta(e.target.value)}>
                       <option value="all">Filtrar por etiqueta</option>
                       {etiquetasDisponiveis.map((etiqueta) => (
