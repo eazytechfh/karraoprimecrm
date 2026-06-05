@@ -92,9 +92,9 @@
   background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
 }
 
-/* Compacta apenas as colunas do Kanban de Negociações para aproveitar melhor zooms altos. */
+/* Mantem as colunas do Kanban de Negociações proporcionais em zooms baixos e altos. */
 .negociacoes-page .w-80 {
-  width: clamp(14rem, 14vw, 20rem);
+  width: clamp(18rem, 20vw, 20rem);
 }
 
 @media (max-width: 900px) {
