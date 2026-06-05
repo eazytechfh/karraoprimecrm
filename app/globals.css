@@ -94,7 +94,7 @@
 
 /* Mantem as colunas do Kanban de Negociações proporcionais em zooms baixos e altos. */
 .negociacoes-page .w-80 {
-  width: clamp(18rem, 20vw, 20rem);
+  width: clamp(15rem, calc((100vw - 22rem) / 6), 18rem);
 }
 
 @media (max-width: 900px) {
