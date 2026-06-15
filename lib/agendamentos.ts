@@ -79,6 +79,53 @@ export const VALID_ESTAGIOS_AGENDAMENTO = [
 
 const DASHBOARD_BATCH_SIZE = 1000
 
+function formatDateInput(date: Date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, "0")
+  const day = String(date.getDate()).padStart(2, "0")
+  return `${year}-${month}-${day}`
+}
+
+function getAgendamentoDateRange(filters?: { dataInicio?: string; dataFim?: string; periodo?: "mes" | "hoje" | "ultimos7dias" }) {
+  if (filters?.dataInicio || filters?.dataFim) {
+    return {
+      startDate: filters.dataInicio,
+      endDate: filters.dataFim,
+    }
+  }
+
+  const now = new Date()
+
+  if (filters?.periodo === "hoje") {
+    const today = formatDateInput(now)
+    return { startDate: today, endDate: today }
+  }
+
+  if (filters?.periodo === "ultimos7dias") {
+    const start = new Date(now)
+    start.setDate(start.getDate() - 6)
+    return { startDate: formatDateInput(start), endDate: formatDateInput(now) }
+  }
+
+  return {
+    startDate: formatDateInput(new Date(now.getFullYear(), now.getMonth(), 1)),
+    endDate: formatDateInput(now),
+  }
+}
+
+function toDateTimeRange(startDate?: string, endDate?: string) {
+  const start = startDate ? new Date(`${startDate}T00:00:00`).toISOString() : undefined
+  let endExclusive: string | undefined
+
+  if (endDate) {
+    const end = new Date(`${endDate}T00:00:00`)
+    end.setDate(end.getDate() + 1)
+    endExclusive = end.toISOString()
+  }
+
+  return { start, endExclusive }
+}
+
 export function formatAgendamentoDate(date?: string) {
   if (!date) return ""
 
@@ -688,27 +735,14 @@ export async function getHistoricoVisitas(
     query = query.eq("estagio_agendamento", normalizeAgendamentoStage(filters.status))
   }
 
-  if (filters?.periodo === "mes") {
-    const now = new Date()
-    const primeiroDiaDoMes = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
-    query = query.gte("updated_at", primeiroDiaDoMes)
-  } else if (filters?.periodo === "hoje") {
-    const hoje = new Date().toISOString().split("T")[0]
-    query = query.gte("updated_at", hoje)
-  } else if (filters?.periodo === "ultimos7dias") {
-    const seteDiasAtras = new Date()
-    seteDiasAtras.setDate(seteDiasAtras.getDate() - 7)
-    query = query.gte("updated_at", seteDiasAtras.toISOString())
+  const { startDate, endDate } = getAgendamentoDateRange(filters)
+
+  if (startDate) {
+    query = query.gte("data_agendamento", startDate)
   }
 
-  if (filters?.dataInicio) {
-    query = query.gte("updated_at", filters.dataInicio)
-  }
-
-  if (filters?.dataFim) {
-    const dataFimAjustada = new Date(filters.dataFim)
-    dataFimAjustada.setDate(dataFimAjustada.getDate() + 1)
-    query = query.lt("updated_at", dataFimAjustada.toISOString())
+  if (endDate) {
+    query = query.lte("data_agendamento", endDate)
   }
 
   if (pagination) {
@@ -749,45 +783,16 @@ interface SdrPerformanceFilters {
 }
 
 function resolveSdrPerformanceDateRange(filters?: SdrPerformanceFilters) {
-  if (filters?.dataInicio || filters?.dataFim) {
-    const start = filters?.dataInicio ? new Date(`${filters.dataInicio}T00:00:00`).toISOString() : undefined
-    let endExclusive: string | undefined
+  const { startDate, endDate } = getAgendamentoDateRange(filters)
+  const { start, endExclusive } = toDateTimeRange(startDate, endDate)
 
-    if (filters?.dataFim) {
-      const endDate = new Date(`${filters.dataFim}T00:00:00`)
-      endDate.setDate(endDate.getDate() + 1)
-      endExclusive = endDate.toISOString()
-    }
-
-    return { start, endExclusive }
-  }
-
-  const now = new Date()
-
-  if (filters?.periodo === "hoje") {
-    return {
-      start: new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString(),
-      endExclusive: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString(),
-    }
-  }
-
-  if (filters?.periodo === "ultimos7dias") {
-    return {
-      start: new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6).toISOString(),
-      endExclusive: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString(),
-    }
-  }
-
-  return {
-    start: new Date(now.getFullYear(), now.getMonth(), 1).toISOString(),
-    endExclusive: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString(),
-  }
+  return { startDate, endDate, start, endExclusive }
 }
 
 export async function getSdrPerformanceStats(idEmpresa: number, filters?: SdrPerformanceFilters): Promise<SdrStats[]> {
   const supabase = createClient()
   const user = getCurrentUser()
-  const { start, endExclusive } = resolveSdrPerformanceDateRange(filters)
+  const { startDate, endDate, start, endExclusive } = resolveSdrPerformanceDateRange(filters)
 
   // Only real SDRs from AUTORIZAÇÃO table
   const { data: sdrsData } = await supabase
@@ -854,8 +859,8 @@ export async function getSdrPerformanceStats(idEmpresa: number, filters?: SdrPer
       .not("sdr_responsavel", "is", null)
       .range(agFrom, agTo)
 
-    if (start) agQuery = agQuery.gte("created_at", start)
-    if (endExclusive) agQuery = agQuery.lt("created_at", endExclusive)
+    if (startDate) agQuery = agQuery.gte("data_agendamento", startDate)
+    if (endDate) agQuery = agQuery.lte("data_agendamento", endDate)
     if (sdrFilter) agQuery = agQuery.eq("sdr_responsavel", sdrFilter)
 
     const { data: agData, error: agError } = await agQuery
@@ -893,8 +898,8 @@ export async function getSdrPerformanceStats(idEmpresa: number, filters?: SdrPer
       .in("estagio_agendamento", ["visita_realizada", "sucesso", "insucesso"])
       .range(visitasFrom, visitasTo)
 
-    if (start) visitasQuery = visitasQuery.gte("updated_at", start)
-    if (endExclusive) visitasQuery = visitasQuery.lt("updated_at", endExclusive)
+    if (startDate) visitasQuery = visitasQuery.gte("data_agendamento", startDate)
+    if (endDate) visitasQuery = visitasQuery.lte("data_agendamento", endDate)
     if (sdrFilter) visitasQuery = visitasQuery.eq("sdr_responsavel", sdrFilter)
 
     const { data: visitasData, error: visitasError } = await visitasQuery
