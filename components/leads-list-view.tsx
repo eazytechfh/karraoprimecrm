@@ -422,14 +422,14 @@ export function LeadsListView({
 
     const csvData = filteredLeads.map((lead) => [
       lead.nome_lead || "",
-      lead.telefone_lead || "",
-      lead.email_lead || "",
-      lead.origem_lead || "",
+      lead.telefone || "",
+      lead.email || "",
+      lead.origem || "",
       lead.veiculo_interesse || "",
       ESTAGIO_LABELS[lead.estagio_lead as keyof typeof ESTAGIO_LABELS] || lead.estagio_lead || "",
       lead.vendedor || "",
       lead.sdr_responsavel || "",
-      lead.data_entrada ? new Date(lead.data_entrada).toLocaleDateString("pt-BR") : "",
+      lead.created_at ? new Date(lead.created_at).toLocaleDateString("pt-BR") : "",
       lead.observacao_vendedor || "",
     ])
 
