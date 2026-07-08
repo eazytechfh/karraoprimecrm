@@ -341,7 +341,7 @@ export async function getLeads(idEmpresa: number): Promise<Lead[]> {
           return true
         }
 
-        return normalizeAgendamentoStage(latestAgendamentoStageByLead[lead.id]) !== "insucesso"
+        return !["sucesso", "insucesso"].includes(normalizeAgendamentoStage(latestAgendamentoStageByLead[lead.id]))
       })
   } catch (error) {
     console.error("Error fetching leads:", error)

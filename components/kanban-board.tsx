@@ -30,6 +30,7 @@ import {
   ChevronDown,
   Tag,
   Check,
+  MessageCircle,
 } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { LeadsListView } from "./leads-list-view"
@@ -92,6 +93,17 @@ const MOTIVOS_LEAD = [
 ]
 const MOTIVO_PREFIX = "[Motivo] "
 const KANBAN_PAGE_SIZE = 20
+
+function getWhatsAppLeadUrl(phone?: string) {
+  const digits = (phone || "").replace(/\D/g, "")
+
+  if (!digits) {
+    return ""
+  }
+
+  const phoneWithCountryCode = digits.startsWith("55") || digits.length > 11 ? digits : `55${digits}`
+  return `https://wa.me/${phoneWithCountryCode}`
+}
 
 export function KanbanBoard() {
   const [leads, setLeads] = useState<Lead[]>([])
@@ -1432,10 +1444,28 @@ export function KanbanBoard() {
                                       </div>
 
                                       {lead.telefone && (
-                                        <p className="text-xs text-gray-600 flex items-center gap-1">
-                                          <Phone className="h-3 w-3" />
-                                          {lead.telefone}
-                                        </p>
+                                        <div className="flex items-center justify-between gap-2">
+                                          <p className="min-w-0 flex items-center gap-1 text-xs text-gray-600">
+                                            <Phone className="h-3 w-3 flex-shrink-0" />
+                                            <span className="truncate">{lead.telefone}</span>
+                                          </p>
+                                          <Button
+                                            asChild
+                                            size="sm"
+                                            className="h-7 w-7 flex-shrink-0 bg-green-600 p-0 text-white hover:bg-green-700"
+                                            onClick={(e) => e.stopPropagation()}
+                                          >
+                                            <a
+                                              href={getWhatsAppLeadUrl(lead.telefone)}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              aria-label={`Abrir WhatsApp de ${lead.nome_lead}`}
+                                              title="Abrir WhatsApp"
+                                            >
+                                              <MessageCircle className="h-3 w-3" />
+                                            </a>
+                                          </Button>
+                                        </div>
                                       )}
                                       {lead.veiculo_interesse && (
                                         <p className="text-xs text-gray-600 flex items-center gap-1 truncate">
@@ -1598,6 +1628,23 @@ export function KanbanBoard() {
                           ))}
                         </DropdownMenuContent>
                       </DropdownMenu>
+                      {selectedLead.telefone && (
+                        <Button
+                          asChild
+                          size="sm"
+                          className="flex items-center gap-2 bg-green-600 text-white hover:bg-green-700"
+                        >
+                          <a
+                            href={getWhatsAppLeadUrl(selectedLead.telefone)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            aria-label={`Abrir WhatsApp de ${selectedLead.nome_lead}`}
+                          >
+                            <MessageCircle className="h-4 w-4" />
+                            WhatsApp
+                          </a>
+                        </Button>
+                      )}
                       {/* Edit Lead button */}
                       <Button
                         variant="default"
