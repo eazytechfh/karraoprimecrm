@@ -200,6 +200,7 @@ async function ensureAgendamentoForLead(
   const { data: existingAgendamento, error: existingError } = await supabase
     .from("AGENDAMENTOS")
     .select("id, vendedor, sdr_responsavel, estagio_agendamento")
+    .eq("id_empresa", lead.id_empresa)
     .eq("id_lead", lead.id)
     .order("created_at", { ascending: false })
     .limit(1)
@@ -223,7 +224,11 @@ async function ensureAgendamentoForLead(
       updates.estagio_agendamento = "agendar"
     }
 
-    const { error: updateError } = await supabase.from("AGENDAMENTOS").update(updates).eq("id", existingAgendamento.id)
+    const { error: updateError } = await supabase
+      .from("AGENDAMENTOS")
+      .update(updates)
+      .eq("id", existingAgendamento.id)
+      .eq("id_empresa", lead.id_empresa)
 
     if (updateError) {
       console.error("Error updating agendamento:", updateError)
@@ -357,13 +362,19 @@ export async function updateLeadStage(leadId: number, newStage: string): Promise
   }
 
   const supabase = createClient()
+  const currentUser = getCurrentUser()
 
   try {
-    const { data: leadData, error: fetchError } = await supabase
+    let fetchQuery = supabase
       .from("BASE_DE_LEADS")
       .select("*")
       .eq("id", leadId)
-      .single()
+
+    if (currentUser) {
+      fetchQuery = fetchQuery.eq("id_empresa", currentUser.id_empresa)
+    }
+
+    const { data: leadData, error: fetchError } = await fetchQuery.single()
 
     if (fetchError || !leadData) {
       console.error("Error fetching lead before update:", fetchError)
@@ -371,6 +382,11 @@ export async function updateLeadStage(leadId: number, newStage: string): Promise
     }
 
     let sdrResponsavel = leadData.sdr_responsavel
+    const oldStage = normalizeLeadStage(leadData.estagio_lead)
+
+    if (currentUser?.cargo === "sdr" && oldStage === "resgate" && newStage !== "resgate") {
+      sdrResponsavel = currentUser.nome_usuario
+    }
 
     if (newStage === "transferido" && leadData.vendedor) {
       console.log("[v0] Lead movido para transferido. Buscando SDR pelo vendedor:", leadData.vendedor)
@@ -400,6 +416,7 @@ export async function updateLeadStage(leadId: number, newStage: string): Promise
         updated_at: new Date().toISOString(),
       })
       .eq("id", leadId)
+      .eq("id_empresa", leadData.id_empresa)
       .select()
 
     if (error) {
@@ -441,7 +458,6 @@ export async function updateLeadStage(leadId: number, newStage: string): Promise
       )
     }
 
-    const currentUser = getCurrentUser()
     if (currentUser) {
       await registerLeadHistory({
         id_lead: leadData.id,
