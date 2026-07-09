@@ -382,9 +382,8 @@ export async function updateLeadStage(leadId: number, newStage: string): Promise
     }
 
     let sdrResponsavel = leadData.sdr_responsavel
-    const oldStage = normalizeLeadStage(leadData.estagio_lead)
 
-    if (currentUser?.cargo === "sdr" && oldStage === "resgate" && newStage !== "resgate") {
+    if (currentUser?.cargo === "sdr" && newStage !== "resgate") {
       sdrResponsavel = currentUser.nome_usuario
     }
 
