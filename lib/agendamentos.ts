@@ -379,6 +379,73 @@ async function syncMissingAgendamentosFromLeads(idEmpresa: number) {
   }
 }
 
+async function getMissingLeadAgendamentoCards(
+  idEmpresa: number,
+  existingAgendamentos: Agendamento[],
+): Promise<Agendamento[]> {
+  const supabase = createClient()
+  const user = getCurrentUser()
+  const existingLeadIds = new Set(existingAgendamentos.map((agendamento) => agendamento.id_lead).filter(Boolean))
+  const missingCards: Agendamento[] = []
+  let from = 0
+
+  while (true) {
+    const to = from + DASHBOARD_BATCH_SIZE - 1
+    let leadsQuery = supabase
+      .from("BASE_DE_LEADS")
+      .select(
+        "id, id_empresa, nome_lead, telefone, email, veiculo_interesse, vendedor, sdr_responsavel, estagio_lead, created_at, updated_at",
+      )
+      .eq("id_empresa", idEmpresa)
+      .in("estagio_lead", ["em_qualificacao", "vendedor", "transferido"])
+      .range(from, to)
+
+    if (user?.cargo === "vendedor") {
+      leadsQuery = leadsQuery.eq("vendedor", user.nome_usuario)
+    }
+
+    const { data: leadsData, error: leadsError } = await leadsQuery
+
+    if (leadsError) {
+      console.error("[v0] Error fetching virtual agendamento leads:", leadsError)
+      return []
+    }
+
+    if (!leadsData || leadsData.length === 0) {
+      break
+    }
+
+    for (const lead of leadsData) {
+      if (existingLeadIds.has(lead.id)) {
+        continue
+      }
+
+      missingCards.push({
+        id: -lead.id,
+        id_empresa: lead.id_empresa,
+        id_lead: lead.id,
+        nome_lead: lead.nome_lead || "Lead sem nome",
+        telefone: lead.telefone || undefined,
+        email: lead.email || undefined,
+        modelo_veiculo: lead.veiculo_interesse || undefined,
+        vendedor: lead.vendedor || undefined,
+        sdr_responsavel: lead.sdr_responsavel || undefined,
+        estagio_agendamento: "agendar",
+        created_at: lead.created_at || new Date().toISOString(),
+        updated_at: lead.updated_at || new Date().toISOString(),
+      })
+    }
+
+    if (leadsData.length < DASHBOARD_BATCH_SIZE) {
+      break
+    }
+
+    from += DASHBOARD_BATCH_SIZE
+  }
+
+  return missingCards
+}
+
 export async function getAgendamentos(idEmpresa: number): Promise<Agendamento[]> {
   const supabase = createClient()
   const user = getCurrentUser()
@@ -401,8 +468,11 @@ export async function getAgendamentos(idEmpresa: number): Promise<Agendamento[]>
       return []
     }
 
-    console.log("[v0] Total de agendamentos retornados para SDR:", agendamentosData?.length || 0)
-    return (agendamentosData || []).map((agendamento) => ({
+    const agendamentos = agendamentosData || []
+    const missingLeadCards = await getMissingLeadAgendamentoCards(idEmpresa, agendamentos)
+
+    console.log("[v0] Total de agendamentos retornados para SDR:", agendamentos.length + missingLeadCards.length)
+    return [...agendamentos, ...missingLeadCards].map((agendamento) => ({
       ...agendamento,
       estagio_agendamento: normalizeAgendamentoStage(agendamento.estagio_agendamento),
     }))
@@ -426,8 +496,11 @@ export async function getAgendamentos(idEmpresa: number): Promise<Agendamento[]>
     return []
   }
 
-  console.log("[v0] Agendamentos retornados:", data?.length || 0)
-  return (data || []).map((agendamento) => ({
+  const agendamentos = data || []
+  const missingLeadCards = await getMissingLeadAgendamentoCards(idEmpresa, agendamentos)
+
+  console.log("[v0] Agendamentos retornados:", agendamentos.length + missingLeadCards.length)
+  return [...agendamentos, ...missingLeadCards].map((agendamento) => ({
     ...agendamento,
     estagio_agendamento: normalizeAgendamentoStage(agendamento.estagio_agendamento),
   }))
