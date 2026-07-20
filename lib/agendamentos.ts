@@ -272,11 +272,119 @@ export function getMoveErrorMessage(cargo: string | undefined): string {
   return `Cargo '${cargo}' não tem permissão para esta movimentação.`
 }
 
+async function syncMissingAgendamentosFromLeads(idEmpresa: number) {
+  const supabase = createClient()
+  const user = getCurrentUser()
+  const leads: Array<{
+    id: number
+    id_empresa: number
+    nome_lead?: string
+    telefone?: string
+    email?: string
+    veiculo_interesse?: string
+    vendedor?: string
+    sdr_responsavel?: string
+    estagio_lead?: string
+  }> = []
+  let from = 0
+
+  while (true) {
+    const to = from + DASHBOARD_BATCH_SIZE - 1
+    let leadsQuery = supabase
+      .from("BASE_DE_LEADS")
+      .select("id, id_empresa, nome_lead, telefone, email, veiculo_interesse, vendedor, sdr_responsavel, estagio_lead")
+      .eq("id_empresa", idEmpresa)
+      .in("estagio_lead", ["em_qualificacao", "vendedor", "transferido"])
+      .range(from, to)
+
+    if (user?.cargo === "vendedor") {
+      leadsQuery = leadsQuery.eq("vendedor", user.nome_usuario)
+    }
+
+    const { data: leadsData, error: leadsError } = await leadsQuery
+
+    if (leadsError) {
+      console.error("[v0] Error fetching leads to sync agendamentos:", leadsError)
+      return
+    }
+
+    if (!leadsData || leadsData.length === 0) {
+      break
+    }
+
+    leads.push(...leadsData)
+
+    if (leadsData.length < DASHBOARD_BATCH_SIZE) {
+      break
+    }
+
+    from += DASHBOARD_BATCH_SIZE
+  }
+
+  if (leads.length === 0) {
+    return
+  }
+
+  const existingLeadIds = new Set<number>()
+  const leadIds = leads.map((lead) => lead.id)
+
+  for (let index = 0; index < leadIds.length; index += DASHBOARD_BATCH_SIZE) {
+    const batch = leadIds.slice(index, index + DASHBOARD_BATCH_SIZE)
+    const { data: existingAgendamentos, error: existingError } = await supabase
+      .from("AGENDAMENTOS")
+      .select("id_lead")
+      .eq("id_empresa", idEmpresa)
+      .in("id_lead", batch)
+
+    if (existingError) {
+      console.error("[v0] Error checking existing agendamentos:", existingError)
+      return
+    }
+
+    for (const agendamento of existingAgendamentos || []) {
+      existingLeadIds.add(agendamento.id_lead)
+    }
+  }
+
+  const missingLeads = leads.filter((lead) => !existingLeadIds.has(lead.id))
+
+  if (missingLeads.length === 0) {
+    return
+  }
+
+  const now = new Date().toISOString()
+  const payload = missingLeads.map((lead) => ({
+    id_empresa: lead.id_empresa,
+    id_lead: lead.id,
+    nome_lead: lead.nome_lead || "Lead sem nome",
+    telefone: lead.telefone || null,
+    email: lead.email || null,
+    modelo_veiculo: lead.veiculo_interesse || null,
+    vendedor: lead.vendedor || null,
+    sdr_responsavel: lead.sdr_responsavel || null,
+    estagio_agendamento: "agendar",
+    created_at: now,
+    updated_at: now,
+  }))
+
+  for (let index = 0; index < payload.length; index += DASHBOARD_BATCH_SIZE) {
+    const { error: insertError } = await supabase
+      .from("AGENDAMENTOS")
+      .insert(payload.slice(index, index + DASHBOARD_BATCH_SIZE))
+
+    if (insertError) {
+      console.error("[v0] Error syncing missing agendamentos:", insertError)
+      return
+    }
+  }
+}
+
 export async function getAgendamentos(idEmpresa: number): Promise<Agendamento[]> {
   const supabase = createClient()
   const user = getCurrentUser()
 
   console.log("[v0] getAgendamentos - user:", { nome: user?.nome_usuario, cargo: user?.cargo })
+  await syncMissingAgendamentosFromLeads(idEmpresa)
 
   // SDR deve ver TODOS os agendamentos da empresa (mesmo comportamento do admin)
   if (user && user.cargo === "sdr") {
