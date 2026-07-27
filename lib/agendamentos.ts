@@ -970,10 +970,44 @@ function resolveSdrPerformanceDateRange(filters?: SdrPerformanceFilters) {
   return { startDate, endDate, start, endExclusive }
 }
 
+function isWithinAgendamentoPerformanceRange(
+  agendamento: Pick<Agendamento, "data_agendamento" | "updated_at">,
+  range: { startDate?: string; endDate?: string; start?: string; endExclusive?: string },
+) {
+  if (agendamento.data_agendamento) {
+    const dataAgendamento = agendamento.data_agendamento.split("T")[0]
+
+    if (range.startDate && dataAgendamento < range.startDate) {
+      return false
+    }
+
+    if (range.endDate && dataAgendamento > range.endDate) {
+      return false
+    }
+
+    return true
+  }
+
+  if (!agendamento.updated_at) {
+    return false
+  }
+
+  if (range.start && agendamento.updated_at < range.start) {
+    return false
+  }
+
+  if (range.endExclusive && agendamento.updated_at >= range.endExclusive) {
+    return false
+  }
+
+  return true
+}
+
 export async function getSdrPerformanceStats(idEmpresa: number, filters?: SdrPerformanceFilters): Promise<SdrStats[]> {
   const supabase = createClient()
   const user = getCurrentUser()
   const { startDate, endDate, start, endExclusive } = resolveSdrPerformanceDateRange(filters)
+  const performanceRange = { startDate, endDate, start, endExclusive }
 
   // Only real SDRs from AUTORIZAÇÃO table
   const { data: sdrsData } = await supabase
@@ -1035,13 +1069,11 @@ export async function getSdrPerformanceStats(idEmpresa: number, filters?: SdrPer
     const agTo = agFrom + DASHBOARD_BATCH_SIZE - 1
     let agQuery = supabase
       .from("AGENDAMENTOS")
-      .select("sdr_responsavel")
+      .select("sdr_responsavel, data_agendamento, updated_at")
       .eq("id_empresa", idEmpresa)
       .not("sdr_responsavel", "is", null)
       .range(agFrom, agTo)
 
-    if (startDate) agQuery = agQuery.gte("data_agendamento", startDate)
-    if (endDate) agQuery = agQuery.lte("data_agendamento", endDate)
     if (sdrFilter) agQuery = agQuery.eq("sdr_responsavel", sdrFilter)
 
     const { data: agData, error: agError } = await agQuery
@@ -1057,6 +1089,7 @@ export async function getSdrPerformanceStats(idEmpresa: number, filters?: SdrPer
     for (const row of agData) {
       const sdr = row.sdr_responsavel as string
       if (!statsMap[sdr]) continue
+      if (!isWithinAgendamentoPerformanceRange(row, performanceRange)) continue
       statsMap[sdr].agendamentos++
     }
 
@@ -1073,14 +1106,12 @@ export async function getSdrPerformanceStats(idEmpresa: number, filters?: SdrPer
     const visitasTo = visitasFrom + DASHBOARD_BATCH_SIZE - 1
     let visitasQuery = supabase
       .from("AGENDAMENTOS")
-      .select("sdr_responsavel, estagio_agendamento")
+      .select("sdr_responsavel, estagio_agendamento, data_agendamento, updated_at")
       .eq("id_empresa", idEmpresa)
       .not("sdr_responsavel", "is", null)
       .in("estagio_agendamento", ["visita_realizada", "sucesso", "insucesso"])
       .range(visitasFrom, visitasTo)
 
-    if (startDate) visitasQuery = visitasQuery.gte("data_agendamento", startDate)
-    if (endDate) visitasQuery = visitasQuery.lte("data_agendamento", endDate)
     if (sdrFilter) visitasQuery = visitasQuery.eq("sdr_responsavel", sdrFilter)
 
     const { data: visitasData, error: visitasError } = await visitasQuery
@@ -1096,6 +1127,7 @@ export async function getSdrPerformanceStats(idEmpresa: number, filters?: SdrPer
     for (const row of visitasData) {
       const sdr = row.sdr_responsavel as string
       if (!statsMap[sdr]) continue
+      if (!isWithinAgendamentoPerformanceRange(row, performanceRange)) continue
 
       const estagio = normalizeAgendamentoStage(row.estagio_agendamento)
       if (["visita_realizada", "sucesso", "insucesso"].includes(estagio)) {
