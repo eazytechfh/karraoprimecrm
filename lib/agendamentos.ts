@@ -888,63 +888,73 @@ export async function getHistoricoVisitas(
 ): Promise<{ data: Agendamento[]; total: number }> {
   const supabase = createClient()
   const user = getCurrentUser()
-
-  let query = supabase
-    .from("AGENDAMENTOS")
-    .select("*", { count: "exact" })
-    .eq("id_empresa", idEmpresa)
-    .in("estagio_agendamento", ["agendar", "nao_compareceu", "reagendado", "visita_realizada", "sucesso", "insucesso"])
-    .order("updated_at", { ascending: false })
-
-  if (user && user.cargo === "vendedor") {
-    query = query.eq("vendedor", user.nome_usuario)
-  }
-
-  if (user && user.cargo === "sdr") {
-    query = query.eq("sdr_responsavel", user.nome_usuario)
-  }
-
-  if (filters?.vendedor) {
-    query = query.eq("vendedor", filters.vendedor)
-  }
-
-  if (filters?.sdr) {
-    query = query.eq("sdr_responsavel", filters.sdr)
-  }
-
-  if (filters?.status) {
-    query = query.eq("estagio_agendamento", normalizeAgendamentoStage(filters.status))
-  }
-
   const { startDate, endDate } = getAgendamentoDateRange(filters)
+  const { start, endExclusive } = toDateTimeRange(startDate, endDate)
+  const dateRange = { startDate, endDate, start, endExclusive }
+  const allData: Agendamento[] = []
+  let from = 0
 
-  if (startDate) {
-    query = query.gte("data_agendamento", startDate)
+  while (true) {
+    const to = from + DASHBOARD_BATCH_SIZE - 1
+    let query = supabase
+      .from("AGENDAMENTOS")
+      .select("*")
+      .eq("id_empresa", idEmpresa)
+      .in("estagio_agendamento", ["agendar", "nao_compareceu", "reagendado", "visita_realizada", "sucesso", "insucesso"])
+      .order("updated_at", { ascending: false })
+      .range(from, to)
+
+    if (user && user.cargo === "vendedor") {
+      query = query.eq("vendedor", user.nome_usuario)
+    }
+
+    if (user && user.cargo === "sdr") {
+      query = query.eq("sdr_responsavel", user.nome_usuario)
+    }
+
+    if (filters?.vendedor) {
+      query = query.eq("vendedor", filters.vendedor)
+    }
+
+    if (filters?.sdr) {
+      query = query.eq("sdr_responsavel", filters.sdr)
+    }
+
+    if (filters?.status) {
+      query = query.eq("estagio_agendamento", normalizeAgendamentoStage(filters.status))
+    }
+
+    const { data, error } = await query
+
+    if (error) {
+      console.error("[v0] Error fetching historico visitas:", error)
+      return { data: [], total: 0 }
+    }
+
+    if (!data || data.length === 0) {
+      break
+    }
+
+    allData.push(...data)
+
+    if (data.length < DASHBOARD_BATCH_SIZE) {
+      break
+    }
+
+    from += DASHBOARD_BATCH_SIZE
   }
 
-  if (endDate) {
-    query = query.lte("data_agendamento", endDate)
-  }
-
-  if (pagination) {
-    const from = (pagination.page - 1) * pagination.pageSize
-    const to = from + pagination.pageSize - 1
-    query = query.range(from, to)
-  }
-
-  const { data, error, count } = await query
-
-  if (error) {
-    console.error("[v0] Error fetching histórico visitas:", error)
-    return { data: [], total: 0 }
-  }
+  const filteredByDate = allData.filter((agendamento) => isWithinAgendamentoPerformanceRange(agendamento, dateRange))
+  const paginatedData = pagination
+    ? filteredByDate.slice((pagination.page - 1) * pagination.pageSize, pagination.page * pagination.pageSize)
+    : filteredByDate
 
   return {
-    data: (data || []).map((agendamento) => ({
+    data: paginatedData.map((agendamento) => ({
       ...agendamento,
       estagio_agendamento: normalizeAgendamentoStage(agendamento.estagio_agendamento),
     })),
-    total: count ?? 0,
+    total: filteredByDate.length,
   }
 }
 
