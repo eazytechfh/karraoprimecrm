@@ -156,7 +156,8 @@ export function parseAgendamentoCheckboxFlags(observacoes?: string): Agendamento
 
 export function shouldAppearInRealizouVisitaColumn(agendamento: Pick<Agendamento, "estagio_agendamento" | "observacoes">) {
   const estagio = normalizeAgendamentoStage(agendamento.estagio_agendamento)
-  return classifySdrFunnelStage(estagio).visita
+  const flags = parseAgendamentoCheckboxFlags(agendamento.observacoes)
+  return classifySdrFunnelStage(estagio, flags.realizouVisita).visita
 }
 
 export const MOTIVOS_PERDA = [
@@ -840,7 +841,7 @@ export async function getSdrPerformanceStats(idEmpresa: number, filters?: SdrPer
     const visitasTo = visitasFrom + DASHBOARD_BATCH_SIZE - 1
     let visitasQuery = supabase
       .from("AGENDAMENTOS")
-      .select("sdr_responsavel, estagio_agendamento")
+      .select("sdr_responsavel, estagio_agendamento, observacoes")
       .eq("id_empresa", idEmpresa)
       .not("sdr_responsavel", "is", null)
       .in("estagio_agendamento", ["visita_realizada", "sucesso", "insucesso"])
@@ -864,7 +865,11 @@ export async function getSdrPerformanceStats(idEmpresa: number, filters?: SdrPer
       const sdr = row.sdr_responsavel as string
       if (!statsMap[sdr]) continue
 
-      const classification = classifySdrFunnelStage(normalizeAgendamentoStage(row.estagio_agendamento))
+      const flags = parseAgendamentoCheckboxFlags(row.observacoes)
+      const classification = classifySdrFunnelStage(
+        normalizeAgendamentoStage(row.estagio_agendamento),
+        flags.realizouVisita,
+      )
       if (classification.visita) {
         statsMap[sdr].visitas++
       }

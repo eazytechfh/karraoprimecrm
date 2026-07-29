@@ -227,6 +227,10 @@ export default function HistoricoVisitasPage() {
       )
     }
 
+    if (appliedFilters.status === "visita_realizada") {
+      filtered = filtered.filter(shouldAppearInRealizouVisitaColumn)
+    }
+
     if (appliedFilters.realizouVisita) {
       filtered = filtered.filter((h) => {
         const realizouVisita = shouldAppearInRealizouVisitaColumn(h)

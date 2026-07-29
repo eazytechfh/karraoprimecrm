@@ -47,8 +47,10 @@ test("classifica as etapas do funil SDR pela regra de negocio", () => {
   assert.deepEqual(classifySdrFunnelStage("agendado"), { agendamento: true, visita: false, sucesso: false })
   assert.deepEqual(classifySdrFunnelStage("reagendado"), { agendamento: true, visita: false, sucesso: false })
   assert.deepEqual(classifySdrFunnelStage("visita_realizada"), { agendamento: true, visita: true, sucesso: false })
-  assert.deepEqual(classifySdrFunnelStage("sucesso"), { agendamento: true, visita: true, sucesso: true })
-  assert.deepEqual(classifySdrFunnelStage("insucesso"), { agendamento: true, visita: true, sucesso: false })
+  assert.deepEqual(classifySdrFunnelStage("sucesso"), { agendamento: true, visita: false, sucesso: true })
+  assert.deepEqual(classifySdrFunnelStage("sucesso", true), { agendamento: true, visita: true, sucesso: true })
+  assert.deepEqual(classifySdrFunnelStage("insucesso"), { agendamento: true, visita: false, sucesso: false })
+  assert.deepEqual(classifySdrFunnelStage("insucesso", true), { agendamento: true, visita: true, sucesso: false })
 })
 
 test("retorna o primeiro e o ultimo dia do mes atual inteiro", () => {
