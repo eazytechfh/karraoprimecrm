@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { SidebarNav } from "@/components/sidebar-nav"
+import { HistoricoVisitaDetailsDialog } from "@/components/historico-visita-details-dialog"
 import { getCurrentUser } from "@/lib/auth"
 import {
   getHistoricoVisitas,
@@ -23,6 +24,7 @@ import {
   normalizeAgendamentoStage,
 } from "@/lib/agendamentos"
 import { getCurrentMonthFullRange } from "@/lib/agendamento-filters"
+import { getHistoricoRowAriaLabel } from "@/lib/historico-visitas"
 import { Calendar, Phone, User, Clock, Filter, Download } from "lucide-react"
 
 const PAGE_SIZE = 50
@@ -165,6 +167,7 @@ export default function HistoricoVisitasPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [totalRecords, setTotalRecords] = useState(0)
   const [sdrStats, setSdrStats] = useState<SdrStats[]>([])
+  const [selectedVisita, setSelectedVisita] = useState<Agendamento | null>(null)
 
   const [filters, setFilters] = useState({
     periodo: "",
@@ -589,6 +592,7 @@ export default function HistoricoVisitasPage() {
                 <CardTitle className="flex items-center justify-between gap-4">
                   <span>
                     Visitas ({filteredHistorico.length} de {totalRecords} exibidas)
+                    <span className="ml-2 text-xs font-normal text-gray-500">Clique em uma linha para ver os detalhes</span>
                   </span>
                   <Button variant="outline" size="sm" onClick={handleExportCSV} className="gap-2 bg-transparent">
                     <Download className="h-4 w-4" />
@@ -625,8 +629,24 @@ export default function HistoricoVisitasPage() {
                           const ganhou = normalizeAgendamentoStage(visita.estagio_agendamento) === "sucesso"
 
                           return (
-                            <TableRow key={visita.id}>
-                              <TableCell className="font-medium">{visita.nome_lead}</TableCell>
+                            <TableRow
+                              key={visita.id}
+                              className="cursor-pointer"
+                              onClick={() => setSelectedVisita(visita)}
+                            >
+                              <TableCell>
+                                <button
+                                  type="button"
+                                  className="text-left font-medium underline-offset-4 hover:underline focus-visible:rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2"
+                                  aria-label={getHistoricoRowAriaLabel(visita.nome_lead)}
+                                  onClick={(event) => {
+                                    event.stopPropagation()
+                                    setSelectedVisita(visita)
+                                  }}
+                                >
+                                  {visita.nome_lead}
+                                </button>
+                              </TableCell>
                               <TableCell>
                                 <div className="flex items-center gap-1 text-sm text-gray-600">
                                   <Phone className="h-3 w-3" />
@@ -733,6 +753,7 @@ export default function HistoricoVisitasPage() {
           </div>
         </main>
       </div>
+      <HistoricoVisitaDetailsDialog visita={selectedVisita} onClose={() => setSelectedVisita(null)} />
     </div>
   )
 }
