@@ -805,7 +805,7 @@ export async function getSdrPerformanceStats(idEmpresa: number, filters?: SdrPer
     leadsFrom += DASHBOARD_BATCH_SIZE
   }
 
-  // Agendamentos por SDR: agendado, reagendado, visita realizada e sucesso
+  // Agendamentos por SDR: agendado, reagendado, visita realizada, sucesso e insucesso
   let agFrom = 0
   while (true) {
     const agTo = agFrom + DASHBOARD_BATCH_SIZE - 1
@@ -844,7 +844,7 @@ export async function getSdrPerformanceStats(idEmpresa: number, filters?: SdrPer
     agFrom += DASHBOARD_BATCH_SIZE
   }
 
-  // Visitas (visita realizada + sucesso) e sucessos no período selecionado
+  // Visitas (visita realizada + sucesso + insucesso) e sucessos no período selecionado
   let visitasFrom = 0
   while (true) {
     const visitasTo = visitasFrom + DASHBOARD_BATCH_SIZE - 1
@@ -853,7 +853,7 @@ export async function getSdrPerformanceStats(idEmpresa: number, filters?: SdrPer
       .select("sdr_responsavel, estagio_agendamento")
       .eq("id_empresa", idEmpresa)
       .not("sdr_responsavel", "is", null)
-      .in("estagio_agendamento", ["visita_realizada", "sucesso"])
+      .in("estagio_agendamento", ["visita_realizada", "sucesso", "insucesso"])
       .range(visitasFrom, visitasTo)
 
     if (startDate) visitasQuery = visitasQuery.gte("data_agendamento", startDate)

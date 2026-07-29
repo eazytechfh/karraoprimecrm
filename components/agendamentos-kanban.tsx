@@ -866,8 +866,7 @@ export function AgendamentosKanban() {
     const mirrors = filteredAgendamentos
       .filter((a) => {
         const currentStage = normalizeAgendamentoStage(a.estagio_agendamento)
-        if (!["sucesso", "insucesso"].includes(currentStage)) return false
-        return parseCheckboxFlagsFromObservacoes(a.observacoes).realizouVisita
+        return ["sucesso", "insucesso"].includes(currentStage)
       })
       .map((a) => ({
         ...a,

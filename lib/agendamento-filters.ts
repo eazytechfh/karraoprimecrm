@@ -13,13 +13,14 @@ export const SDR_FUNNEL_APPOINTMENT_STAGES = [
   "reagendado",
   "visita_realizada",
   "sucesso",
+  "insucesso",
 ] as const
 
 export function classifySdrFunnelStage(stage?: string | null) {
   const normalized = (stage || "").toLowerCase().trim()
   return {
     agendamento: SDR_FUNNEL_APPOINTMENT_STAGES.some((item) => item === normalized),
-    visita: normalized === "visita_realizada" || normalized === "sucesso",
+    visita: ["visita_realizada", "sucesso", "insucesso"].includes(normalized),
     sucesso: normalized === "sucesso",
   }
 }
