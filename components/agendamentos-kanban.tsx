@@ -1371,8 +1371,8 @@ export function AgendamentosKanban() {
       </DndContext>
 
       <Dialog open={selectedAgendamento !== null} onOpenChange={() => setSelectedAgendamento(null)}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
-          <DialogHeader>
+        <DialogContent className="flex h-[90vh] max-h-[760px] max-w-lg flex-col overflow-hidden">
+          <DialogHeader className="shrink-0">
             <DialogTitle className="flex items-center gap-2">
               {selectedAgendamento?.nome_lead}
               {isVendedor && (
@@ -1396,7 +1396,7 @@ export function AgendamentosKanban() {
 
           {selectedAgendamento && (
             <>
-              <ScrollArea className="flex-1 pr-4">
+              <ScrollArea className="min-h-0 flex-1 pr-4">
                 <div className="space-y-4">
                   {(formData.data_agendamento || formData.hora_agendamento) && (
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
@@ -1628,7 +1628,7 @@ export function AgendamentosKanban() {
                 </div>
               </ScrollArea>
 
-              <DialogFooter className="mt-4 pt-4 border-t">
+              <DialogFooter className="mt-4 shrink-0 border-t pt-4">
                 {userCanEdit || isVendedor || isSdr ? (
                   <div className="flex gap-2 w-full">
                     <Button
