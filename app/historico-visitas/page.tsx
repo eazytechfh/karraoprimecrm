@@ -176,6 +176,7 @@ export default function HistoricoVisitasPage() {
     dataInicio: defaultMonthRange.dataInicio,
     dataFim: defaultMonthRange.dataFim,
   })
+  const [appliedFilters, setAppliedFilters] = useState(filters)
 
   const currentUser = getCurrentUser()
 
@@ -205,6 +206,7 @@ export default function HistoricoVisitasPage() {
     ])
 
     setHistorico(historicoResult.data)
+    setAppliedFilters({ ...sourceFilters })
     setTotalRecords(historicoResult.total)
     setCurrentPage(page)
     if (vendedoresData) setVendedores(vendedoresData)
@@ -225,27 +227,17 @@ export default function HistoricoVisitasPage() {
       )
     }
 
-    if (filters.status) {
-      filtered = filtered.filter((h) => {
-        if (filters.status === "visita_realizada") {
-          return shouldAppearInRealizouVisitaColumn(h)
-        }
-
-        return normalizeAgendamentoStage(h.estagio_agendamento) === filters.status
-      })
-    }
-
-    if (filters.realizouVisita) {
+    if (appliedFilters.realizouVisita) {
       filtered = filtered.filter((h) => {
         const realizouVisita = shouldAppearInRealizouVisitaColumn(h)
-        return filters.realizouVisita === "sim" ? realizouVisita : !realizouVisita
+        return appliedFilters.realizouVisita === "sim" ? realizouVisita : !realizouVisita
       })
     }
 
-    if (filters.ganho) {
+    if (appliedFilters.ganho) {
       filtered = filtered.filter((h) => {
         const ganhou = normalizeAgendamentoStage(h.estagio_agendamento) === "sucesso"
-        return filters.ganho === "sim" ? ganhou : !ganhou
+        return appliedFilters.ganho === "sim" ? ganhou : !ganhou
       })
     }
 
@@ -287,7 +279,7 @@ export default function HistoricoVisitasPage() {
   }
 
   const handlePageChange = (page: number) => {
-    loadData(page)
+    loadData(page, appliedFilters)
   }
 
   const formatDateTime = (dateString: string) => {
@@ -331,7 +323,7 @@ export default function HistoricoVisitasPage() {
   const handleExportCSV = async () => {
     if (!currentUser) return
 
-    const { data: allData } = await getHistoricoVisitas(currentUser.id_empresa, buildFilterParams())
+    const { data: allData } = await getHistoricoVisitas(currentUser.id_empresa, buildFilterParams(appliedFilters))
 
     const headers = [
       "Cliente",
@@ -396,7 +388,7 @@ export default function HistoricoVisitasPage() {
 
   useEffect(() => {
     filterHistorico()
-  }, [historico, searchTerm, filters.status, filters.realizouVisita, filters.ganho])
+  }, [historico, searchTerm, appliedFilters.realizouVisita, appliedFilters.ganho])
 
   if (loading) {
     return (

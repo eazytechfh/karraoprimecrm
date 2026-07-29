@@ -156,17 +156,7 @@ export function parseAgendamentoCheckboxFlags(observacoes?: string): Agendamento
 
 export function shouldAppearInRealizouVisitaColumn(agendamento: Pick<Agendamento, "estagio_agendamento" | "observacoes">) {
   const estagio = normalizeAgendamentoStage(agendamento.estagio_agendamento)
-
-  if (estagio === "visita_realizada") {
-    return true
-  }
-
-  if (estagio !== "sucesso") {
-    return false
-  }
-
-  const flags = parseAgendamentoCheckboxFlags(agendamento.observacoes)
-  return flags.ganho && flags.realizouVisita
+  return classifySdrFunnelStage(estagio).visita
 }
 
 export const MOTIVOS_PERDA = [
