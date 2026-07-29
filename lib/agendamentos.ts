@@ -7,6 +7,7 @@ import {
   resolveHistoricoStages,
 } from "@/lib/agendamento-filters"
 import { getCurrentUser } from "@/lib/auth"
+import { collectPaginatedRows } from "@/lib/pagination"
 
 export interface Agendamento {
   id: number
@@ -251,51 +252,34 @@ export async function getAgendamentos(idEmpresa: number): Promise<Agendamento[]>
 
   console.log("[v0] getAgendamentos - user:", { nome: user?.nome_usuario, cargo: user?.cargo })
 
-  // SDR deve ver TODOS os agendamentos da empresa (mesmo comportamento do admin)
-  if (user && user.cargo === "sdr") {
-    console.log("[v0] Buscando TODOS os agendamentos para SDR:", user.nome_usuario)
+  try {
+    const data = await collectPaginatedRows<any>(async (from, to) => {
+      let query = supabase
+        .from("AGENDAMENTOS")
+        .select("*")
+        .eq("id_empresa", idEmpresa)
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
+        .range(from, to)
 
-    const { data: agendamentosData, error: agendamentosError } = await supabase
-      .from("AGENDAMENTOS")
-      .select("*")
-      .eq("id_empresa", idEmpresa)
-      .order("created_at", { ascending: false })
+      if (user?.cargo === "vendedor") {
+        query = query.eq("vendedor", user.nome_usuario)
+      }
 
-    if (agendamentosError) {
-      console.error("[v0] Error fetching agendamentos:", agendamentosError)
-      return []
-    }
+      const { data: page, error } = await query
+      if (error) throw error
+      return page || []
+    }, DASHBOARD_BATCH_SIZE)
 
-    console.log("[v0] Total de agendamentos retornados para SDR:", agendamentosData?.length || 0)
-    return (agendamentosData || []).map((agendamento) => ({
+    console.log("[v0] Total de agendamentos retornados:", data.length)
+    return data.map((agendamento) => ({
       ...agendamento,
       estagio_agendamento: normalizeAgendamentoStage(agendamento.estagio_agendamento),
     }))
-  }
-
-  let query = supabase
-    .from("AGENDAMENTOS")
-    .select("*")
-    .eq("id_empresa", idEmpresa)
-    .order("created_at", { ascending: false })
-
-  if (user && user.cargo === "vendedor") {
-    console.log("[v0] Filtrando agendamentos para Vendedor:", user.nome_usuario)
-    query = query.eq("vendedor", user.nome_usuario)
-  }
-
-  const { data, error } = await query
-
-  if (error) {
-    console.error("[v0] Error fetching agendamentos:", error)
+  } catch (error) {
+    console.error("[v0] Error fetching all agendamentos:", error)
     return []
   }
-
-  console.log("[v0] Agendamentos retornados:", data?.length || 0)
-  return (data || []).map((agendamento) => ({
-    ...agendamento,
-    estagio_agendamento: normalizeAgendamentoStage(agendamento.estagio_agendamento),
-  }))
 }
 
 export async function getAgendamentosByLead(idLead: number): Promise<Agendamento[]> {
