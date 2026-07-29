@@ -1080,86 +1080,26 @@ export async function getSdrPerformanceStats(idEmpresa: number, filters?: SdrPer
     leadsFrom += DASHBOARD_BATCH_SIZE
   }
 
-  // Agendamentos por SDR (mês atual)
-  let agFrom = 0
-  while (true) {
-    const agTo = agFrom + DASHBOARD_BATCH_SIZE - 1
-    let agQuery = supabase
-      .from("AGENDAMENTOS")
-      .select("sdr_responsavel, data_agendamento, updated_at")
-      .eq("id_empresa", idEmpresa)
-      .not("sdr_responsavel", "is", null)
-      .range(agFrom, agTo)
+  const agendamentos = await getAgendamentos(idEmpresa)
 
-    if (sdrFilter) agQuery = agQuery.eq("sdr_responsavel", sdrFilter)
+  for (const agendamento of agendamentos) {
+    const sdr = agendamento.sdr_responsavel
+    if (!sdr || !statsMap[sdr]) continue
+    if (sdrFilter && sdr !== sdrFilter) continue
+    if (!isWithinAgendamentoPerformanceRange(agendamento, performanceRange)) continue
 
-    const { data: agData, error: agError } = await agQuery
+    const estagio = normalizeAgendamentoStage(agendamento.estagio_agendamento)
+    const flags = parseAgendamentoCheckboxFlags(agendamento.observacoes)
 
-    if (agError) {
-      throw agError
+    statsMap[sdr].agendamentos++
+
+    if (estagio === "visita_realizada" || (["sucesso", "insucesso"].includes(estagio) && flags.realizouVisita)) {
+      statsMap[sdr].visitas++
     }
 
-    if (!agData || agData.length === 0) {
-      break
+    if (estagio === "sucesso") {
+      statsMap[sdr].sucesso++
     }
-
-    for (const row of agData) {
-      const sdr = row.sdr_responsavel as string
-      if (!statsMap[sdr]) continue
-      if (!isWithinAgendamentoPerformanceRange(row, performanceRange)) continue
-      statsMap[sdr].agendamentos++
-    }
-
-    if (agData.length < DASHBOARD_BATCH_SIZE) {
-      break
-    }
-
-    agFrom += DASHBOARD_BATCH_SIZE
-  }
-
-  // Visitas e sucessos do mês atual, considerando a movimentação ocorrida no mês
-  let visitasFrom = 0
-  while (true) {
-    const visitasTo = visitasFrom + DASHBOARD_BATCH_SIZE - 1
-    let visitasQuery = supabase
-      .from("AGENDAMENTOS")
-      .select("sdr_responsavel, estagio_agendamento, data_agendamento, updated_at")
-      .eq("id_empresa", idEmpresa)
-      .not("sdr_responsavel", "is", null)
-      .in("estagio_agendamento", ["visita_realizada", "sucesso", "insucesso"])
-      .range(visitasFrom, visitasTo)
-
-    if (sdrFilter) visitasQuery = visitasQuery.eq("sdr_responsavel", sdrFilter)
-
-    const { data: visitasData, error: visitasError } = await visitasQuery
-
-    if (visitasError) {
-      throw visitasError
-    }
-
-    if (!visitasData || visitasData.length === 0) {
-      break
-    }
-
-    for (const row of visitasData) {
-      const sdr = row.sdr_responsavel as string
-      if (!statsMap[sdr]) continue
-      if (!isWithinAgendamentoPerformanceRange(row, performanceRange)) continue
-
-      const estagio = normalizeAgendamentoStage(row.estagio_agendamento)
-      if (["visita_realizada", "sucesso", "insucesso"].includes(estagio)) {
-        statsMap[sdr].visitas++
-      }
-      if (estagio === "sucesso") {
-        statsMap[sdr].sucesso++
-      }
-    }
-
-    if (visitasData.length < DASHBOARD_BATCH_SIZE) {
-      break
-    }
-
-    visitasFrom += DASHBOARD_BATCH_SIZE
   }
 
   return Object.values(statsMap).sort((a, b) => a.sdr.localeCompare(b.sdr, "pt-BR"))
