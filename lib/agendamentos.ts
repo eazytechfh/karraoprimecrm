@@ -1,4 +1,11 @@
 import { createClient } from "@/utils/supabase/client"
+import {
+  HISTORICO_AGENDAMENTO_STAGES,
+  SDR_FUNNEL_APPOINTMENT_STAGES,
+  classifySdrFunnelStage,
+  resolveAgendamentoDateRange,
+  resolveHistoricoStages,
+} from "@/lib/agendamento-filters"
 import { getCurrentUser } from "@/lib/auth"
 
 export interface Agendamento {
@@ -78,40 +85,6 @@ export const VALID_ESTAGIOS_AGENDAMENTO = [
 ]
 
 const DASHBOARD_BATCH_SIZE = 1000
-
-function formatDateInput(date: Date) {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, "0")
-  const day = String(date.getDate()).padStart(2, "0")
-  return `${year}-${month}-${day}`
-}
-
-function getAgendamentoDateRange(filters?: { dataInicio?: string; dataFim?: string; periodo?: "mes" | "hoje" | "ultimos7dias" }) {
-  if (filters?.dataInicio || filters?.dataFim) {
-    return {
-      startDate: filters.dataInicio,
-      endDate: filters.dataFim,
-    }
-  }
-
-  const now = new Date()
-
-  if (filters?.periodo === "hoje") {
-    const today = formatDateInput(now)
-    return { startDate: today, endDate: today }
-  }
-
-  if (filters?.periodo === "ultimos7dias") {
-    const start = new Date(now)
-    start.setDate(start.getDate() - 6)
-    return { startDate: formatDateInput(start), endDate: formatDateInput(now) }
-  }
-
-  return {
-    startDate: formatDateInput(new Date(now.getFullYear(), now.getMonth(), 1)),
-    endDate: formatDateInput(now),
-  }
-}
 
 function toDateTimeRange(startDate?: string, endDate?: string) {
   const start = startDate ? new Date(`${startDate}T00:00:00`).toISOString() : undefined
@@ -712,7 +685,7 @@ export async function getHistoricoVisitas(
     .from("AGENDAMENTOS")
     .select("*", { count: "exact" })
     .eq("id_empresa", idEmpresa)
-    .in("estagio_agendamento", ["agendar", "nao_compareceu", "reagendado", "visita_realizada", "sucesso", "insucesso"])
+    .in("estagio_agendamento", [...HISTORICO_AGENDAMENTO_STAGES])
     .order("updated_at", { ascending: false })
 
   if (user && user.cargo === "vendedor") {
@@ -732,10 +705,10 @@ export async function getHistoricoVisitas(
   }
 
   if (filters?.status) {
-    query = query.eq("estagio_agendamento", normalizeAgendamentoStage(filters.status))
+    query = query.in("estagio_agendamento", resolveHistoricoStages(normalizeAgendamentoStage(filters.status)))
   }
 
-  const { startDate, endDate } = getAgendamentoDateRange(filters)
+  const { startDate, endDate } = resolveAgendamentoDateRange(filters)
 
   if (startDate) {
     query = query.gte("data_agendamento", startDate)
@@ -783,7 +756,7 @@ interface SdrPerformanceFilters {
 }
 
 function resolveSdrPerformanceDateRange(filters?: SdrPerformanceFilters) {
-  const { startDate, endDate } = getAgendamentoDateRange(filters)
+  const { startDate, endDate } = resolveAgendamentoDateRange(filters)
   const { start, endExclusive } = toDateTimeRange(startDate, endDate)
 
   return { startDate, endDate, start, endExclusive }
@@ -811,7 +784,7 @@ export async function getSdrPerformanceStats(idEmpresa: number, filters?: SdrPer
 
   const sdrFilter = user?.cargo === "sdr" ? user.nome_usuario : filters?.sdr || null
 
-  // Leads por SDR (mês atual)
+  // Leads por SDR no período selecionado
   let leadsFrom = 0
   while (true) {
     const leadsTo = leadsFrom + DASHBOARD_BATCH_SIZE - 1
@@ -848,15 +821,16 @@ export async function getSdrPerformanceStats(idEmpresa: number, filters?: SdrPer
     leadsFrom += DASHBOARD_BATCH_SIZE
   }
 
-  // Agendamentos por SDR (mês atual)
+  // Agendamentos por SDR: agendado, reagendado e visita realizada
   let agFrom = 0
   while (true) {
     const agTo = agFrom + DASHBOARD_BATCH_SIZE - 1
     let agQuery = supabase
       .from("AGENDAMENTOS")
-      .select("sdr_responsavel")
+      .select("sdr_responsavel, estagio_agendamento")
       .eq("id_empresa", idEmpresa)
       .not("sdr_responsavel", "is", null)
+      .in("estagio_agendamento", [...SDR_FUNNEL_APPOINTMENT_STAGES])
       .range(agFrom, agTo)
 
     if (startDate) agQuery = agQuery.gte("data_agendamento", startDate)
@@ -886,7 +860,7 @@ export async function getSdrPerformanceStats(idEmpresa: number, filters?: SdrPer
     agFrom += DASHBOARD_BATCH_SIZE
   }
 
-  // Visitas e sucessos do mês atual, considerando a movimentação ocorrida no mês
+  // Visitas e sucessos no período selecionado
   let visitasFrom = 0
   while (true) {
     const visitasTo = visitasFrom + DASHBOARD_BATCH_SIZE - 1
@@ -895,7 +869,7 @@ export async function getSdrPerformanceStats(idEmpresa: number, filters?: SdrPer
       .select("sdr_responsavel, estagio_agendamento")
       .eq("id_empresa", idEmpresa)
       .not("sdr_responsavel", "is", null)
-      .in("estagio_agendamento", ["visita_realizada", "sucesso", "insucesso"])
+      .in("estagio_agendamento", ["visita_realizada", "sucesso"])
       .range(visitasFrom, visitasTo)
 
     if (startDate) visitasQuery = visitasQuery.gte("data_agendamento", startDate)
@@ -916,11 +890,11 @@ export async function getSdrPerformanceStats(idEmpresa: number, filters?: SdrPer
       const sdr = row.sdr_responsavel as string
       if (!statsMap[sdr]) continue
 
-      const estagio = normalizeAgendamentoStage(row.estagio_agendamento)
-      if (["visita_realizada", "sucesso", "insucesso"].includes(estagio)) {
+      const classification = classifySdrFunnelStage(normalizeAgendamentoStage(row.estagio_agendamento))
+      if (classification.visita) {
         statsMap[sdr].visitas++
       }
-      if (estagio === "sucesso") {
+      if (classification.sucesso) {
         statsMap[sdr].sucesso++
       }
     }

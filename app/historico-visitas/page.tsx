@@ -30,6 +30,7 @@ type HistoricoFilterParams = {
   periodo?: "mes" | "hoje" | "ultimos7dias"
   vendedor?: string
   sdr?: string
+  status?: string
   dataInicio?: string
   dataFim?: string
 }
@@ -161,7 +162,6 @@ function SdrFunnelTable({ stats }: { stats: SdrStats[] }) {
 
 export default function HistoricoVisitasPage() {
   const router = useRouter()
-  const currentMonthRange = getCurrentMonthDateRange()
   const [historico, setHistorico] = useState<Agendamento[]>([])
   const [filteredHistorico, setFilteredHistorico] = useState<Agendamento[]>([])
   const [vendedores, setVendedores] = useState<Vendedor[]>([])
@@ -179,28 +179,29 @@ export default function HistoricoVisitasPage() {
     status: "",
     realizouVisita: "",
     ganho: "",
-    dataInicio: currentMonthRange.dataInicio,
-    dataFim: currentMonthRange.dataFim,
+    dataInicio: "",
+    dataFim: "",
   })
 
   const currentUser = getCurrentUser()
 
-  const buildFilterParams = (): HistoricoFilterParams => {
+  const buildFilterParams = (sourceFilters = filters): HistoricoFilterParams => {
     const filterParams: HistoricoFilterParams = {}
-    if (filters.periodo) filterParams.periodo = filters.periodo as HistoricoFilterParams["periodo"]
-    if (filters.vendedor) filterParams.vendedor = filters.vendedor
-    if (filters.sdr) filterParams.sdr = filters.sdr
-    if (filters.dataInicio) filterParams.dataInicio = filters.dataInicio
-    if (filters.dataFim) filterParams.dataFim = filters.dataFim
+    if (sourceFilters.periodo) filterParams.periodo = sourceFilters.periodo as HistoricoFilterParams["periodo"]
+    if (sourceFilters.vendedor) filterParams.vendedor = sourceFilters.vendedor
+    if (sourceFilters.sdr) filterParams.sdr = sourceFilters.sdr
+    if (sourceFilters.status) filterParams.status = sourceFilters.status
+    if (sourceFilters.dataInicio) filterParams.dataInicio = sourceFilters.dataInicio
+    if (sourceFilters.dataFim) filterParams.dataFim = sourceFilters.dataFim
     return filterParams
   }
 
-  const loadData = async (page = 1) => {
+  const loadData = async (page = 1, sourceFilters = filters) => {
     if (!currentUser) return
 
     setLoading(true)
 
-    const filterParams = buildFilterParams()
+    const filterParams = buildFilterParams(sourceFilters)
 
     const [historicoResult, vendedoresData, sdrsData, statsData] = await Promise.all([
       getHistoricoVisitas(currentUser.id_empresa, filterParams, { page, pageSize: PAGE_SIZE }),
@@ -277,17 +278,18 @@ export default function HistoricoVisitasPage() {
   }
 
   const handleClearFilters = () => {
-    setFilters({
+    const clearedFilters = {
       periodo: "",
       vendedor: "",
       sdr: "",
       status: "",
       realizouVisita: "",
       ganho: "",
-      dataInicio: currentMonthRange.dataInicio,
-      dataFim: currentMonthRange.dataFim,
-    })
-    setTimeout(() => loadData(1), 0)
+      dataInicio: "",
+      dataFim: "",
+    }
+    setFilters(clearedFilters)
+    loadData(1, clearedFilters)
   }
 
   const handlePageChange = (page: number) => {

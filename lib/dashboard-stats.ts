@@ -1,5 +1,6 @@
 import { normalizeLeadStage } from "@/lib/leads"
 import { normalizeAgendamentoStage } from "@/lib/agendamentos"
+import { calculateCrmMetrics } from "@/lib/crm-metrics"
 import { createClient } from "@/utils/supabase/client"
 
 export interface DashboardFilters {
@@ -51,6 +52,7 @@ export interface EstagioEvolution {
 }
 
 const DASHBOARD_BATCH_SIZE = 1000
+const DASHBOARD_ID_BATCH_SIZE = 200
 
 function getStartDateFromPeriodo(periodo?: string) {
   if (!periodo) return null
@@ -90,6 +92,7 @@ async function fetchAllDashboardLeads(
   while (true) {
     const to = from + DASHBOARD_BATCH_SIZE - 1
     let query = supabase.from("BASE_DE_LEADS").select("*").eq("id_empresa", idEmpresa)
+      .order("id", { ascending: true })
 
     if (filters.vendedor) {
       query = query.eq("vendedor", filters.vendedor)
@@ -123,6 +126,39 @@ async function fetchAllDashboardLeads(
   }
 
   return allLeads
+}
+
+async function fetchDashboardAgendamentos(idEmpresa: number, leadIds: number[]) {
+  if (leadIds.length === 0) return []
+
+  const supabase = createClient()
+  const rows: any[] = []
+
+  for (let index = 0; index < leadIds.length; index += DASHBOARD_ID_BATCH_SIZE) {
+    const batch = leadIds.slice(index, index + DASHBOARD_ID_BATCH_SIZE)
+    let from = 0
+
+    while (true) {
+      const to = from + DASHBOARD_BATCH_SIZE - 1
+      const { data, error } = await supabase
+        .from("AGENDAMENTOS")
+        .select("*")
+        .eq("id_empresa", idEmpresa)
+        .in("id_lead", batch)
+        .order("updated_at", { ascending: false })
+        .order("id", { ascending: false })
+        .range(from, to)
+
+      if (error) throw error
+      if (!data || data.length === 0) break
+
+      rows.push(...data)
+      if (data.length < DASHBOARD_BATCH_SIZE) break
+      from += DASHBOARD_BATCH_SIZE
+    }
+  }
+
+  return rows
 }
 
 export async function getDashboardData(idEmpresa: number, filters: DashboardFilters = {}) {
@@ -179,17 +215,23 @@ export async function getDashboardData(idEmpresa: number, filters: DashboardFilt
 
   const { count: totalLeadsReal, error: countError } = await countQuery
 
-  const { data: agendamentos, error: agendamentosError } = await supabase
-    .from("AGENDAMENTOS")
-    .select("*")
-    .eq("id_empresa", idEmpresa)
+  let agendamentos: any[] = []
+  try {
+    agendamentos = await fetchDashboardAgendamentos(
+      idEmpresa,
+      leads.map((lead) => lead.id),
+    )
+  } catch (agendamentosError) {
+    console.error("Error fetching dashboard appointments:", agendamentosError)
+  }
 
   if (countError) {
     console.warn("Count error (using leads.length as fallback):", countError)
   }
 
   // ✅ TOTAL REAL (se falhar o count, cai no length)
-  const totalLeads = (totalLeadsReal ?? leads.length) as number
+  const metrics = calculateCrmMetrics(leads, agendamentos)
+  const totalLeads = (totalLeadsReal ?? metrics.totalLeads) as number
 
   // Estatísticas básicas espelhando BASE_DE_LEADS
   // (não usar leads.length aqui pois pode estar limitado a 1000 no retorno)
@@ -199,25 +241,16 @@ export async function getDashboardData(idEmpresa: number, filters: DashboardFilt
   // (você pediu somente o bloco Total de Leads)
 
   // Agrupamento por ESTAGIO_LEAD (coluna estagio_lead)
-  const leadsPorEstagio = leads.reduce((acc: any, lead) => {
-    const estagio = normalizeLeadStage(lead.estagio_lead)
-    acc[estagio] = (acc[estagio] || 0) + 1
-    return acc
-  }, {})
+  const leadsPorEstagio = metrics.leadsPorEstagio
 
   // Agrupamento por ORIGEM (coluna origem)
-  const leadsPorOrigem = leads.reduce((acc: any, lead) => {
-    if (lead.origem) {
-      acc[lead.origem] = (acc[lead.origem] || 0) + 1
-    }
-    return acc
-  }, {})
+  const leadsPorOrigem = metrics.leadsPorOrigem
 
-  const fechados = leadsPorEstagio.fechado || 0
-  const conversao = totalLeads > 0 ? ((fechados / totalLeads) * 100).toFixed(1) : "0"
+  const successfulLeadIds = new Set(metrics.successfulLeadIds)
+  const conversao = metrics.conversao
 
   // Calcular valores totais
-  const valorTotal = leads.reduce((sum, lead) => sum + (Number(lead.valor) || 0), 0)
+  const valorTotal = metrics.valorTotal
   const valorTotalInteiro = Math.trunc(valorTotal) // ✅ remove ",00"
   const valorMedio = totalLeads > 0 ? valorTotal / totalLeads : 0
 
@@ -238,7 +271,7 @@ export async function getDashboardData(idEmpresa: number, filters: DashboardFilt
     acc[lead.vendedor].total_leads++
     acc[lead.vendedor].valor_total += Number(lead.valor) || 0
 
-    if (lead.estagio_lead === "fechado") {
+    if (successfulLeadIds.has(lead.id)) {
       acc[lead.vendedor].leads_fechados++
     }
 
@@ -273,7 +306,7 @@ export async function getDashboardData(idEmpresa: number, filters: DashboardFilt
     acc[lead.veiculo_interesse].total_interesse++
     acc[lead.veiculo_interesse].valor_total += Number(lead.valor) || 0
 
-    if (lead.estagio_lead === "fechado") {
+    if (successfulLeadIds.has(lead.id)) {
       acc[lead.veiculo_interesse].leads_fechados++
     }
 
@@ -304,7 +337,7 @@ export async function getDashboardData(idEmpresa: number, filters: DashboardFilt
     acc[lead.origem].total_leads++
     acc[lead.origem].valor_total += Number(lead.valor) || 0
 
-    if (lead.estagio_lead === "fechado") {
+    if (successfulLeadIds.has(lead.id)) {
       acc[lead.origem].leads_fechados++
     }
 
@@ -319,9 +352,9 @@ export async function getDashboardData(idEmpresa: number, filters: DashboardFilt
     }))
     .sort((a, b) => b.total_leads - a.total_leads) // Ordenar por quantidade (maior para menor)
 
-  const sdrAgrupamento = (agendamentos || []).reduce((acc: any, agendamento) => {
+  const sdrAgrupamento = metrics.latestAgendamentos.reduce((acc: any, agendamento: any) => {
     const sdr = agendamento.sdr_responsavel || "Não atribuído"
-    const estagioAgendamento = normalizeAgendamentoStage(agendamento.estagio)
+    const estagioAgendamento = normalizeAgendamentoStage(agendamento.estagio_agendamento)
 
     if (!acc[sdr]) {
       acc[sdr] = {
@@ -406,6 +439,8 @@ export async function getDashboardData(idEmpresa: number, filters: DashboardFilt
 
   return {
     totalLeads, // ✅ agora é o TOTAL REAL (count exact)
+    totalVendas: metrics.totalVendas,
+    totalAgendamentos: metrics.totalAgendamentos,
     leadsPorEstagio,
     leadsPorOrigem,
     conversao,

@@ -1,10 +1,8 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { getAccurateLeadStats, ESTAGIO_LABELS } from "@/lib/leads"
-import { getCurrentUser } from "@/lib/auth"
+import { ESTAGIO_LABELS } from "@/lib/leads"
 import { Users, TrendingUp, Award, Zap, Activity, DollarSign } from "lucide-react"
 
 // Função para formatar moeda
@@ -17,50 +15,20 @@ function formatCurrency(value: number): string {
   }).format(value)
 }
 
-export function DashboardStats() {
-  const [stats, setStats] = useState({
-    totalLeads: 0,
-    leadsPorEstagio: {},
-    leadsPorOrigem: {},
-    conversao: "0",
-    valorTotal: 0,
-    valorMedio: 0,
-  })
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    const loadStats = async () => {
-      const user = getCurrentUser()
-      if (user) {
-        const data = await getAccurateLeadStats(user.id_empresa)
-        setStats(data)
-      }
-      setLoading(false)
-    }
-
-    loadStats()
-  }, [])
-
-  if (loading) {
-    return (
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        {[...Array(4)].map((_, i) => (
-          <Card key={i} className="animate-pulse border-0 shadow-xl">
-            <CardContent className="p-6">
-              <div className="flex items-center space-x-4">
-                <div className="w-14 h-14 bg-gradient-to-r from-gray-200 to-gray-300 rounded-2xl"></div>
-                <div className="space-y-3 flex-1">
-                  <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                  <div className="h-8 bg-gray-300 rounded w-1/2"></div>
-                  <div className="h-3 bg-gray-200 rounded w-2/3"></div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    )
+interface DashboardStatsProps {
+  stats: {
+    totalLeads: number
+    totalVendas: number
+    totalAgendamentos: number
+    leadsPorEstagio: Record<string, number>
+    leadsPorOrigem: Record<string, number>
+    conversao: string
+    valorTotal: number
+    valorMedio: number
   }
+}
+
+export function DashboardStats({ stats }: DashboardStatsProps) {
 
   const statCards = [
     {
@@ -71,8 +39,6 @@ export function DashboardStats() {
       gradient: "from-purple-500 to-blue-500",
       bgGradient: "from-purple-50 via-white to-blue-50",
       borderColor: "border-purple-200",
-      change: "+12%",
-      changeType: "positive",
     },
     {
       title: "Taxa de Conversão",
@@ -82,8 +48,6 @@ export function DashboardStats() {
       gradient: "from-blue-500 to-cyan-500",
       bgGradient: "from-blue-50 via-white to-cyan-50",
       borderColor: "border-blue-200",
-      change: "+2.3%",
-      changeType: "positive",
     },
     {
       title: "Valor Total",
@@ -93,19 +57,15 @@ export function DashboardStats() {
       gradient: "from-green-500 to-emerald-500",
       bgGradient: "from-green-50 via-white to-emerald-50",
       borderColor: "border-green-200",
-      change: "+15%",
-      changeType: "positive",
     },
     {
       title: "Fechados",
-      value: stats.leadsPorEstagio.fechado || 0,
+      value: stats.totalVendas,
       subtitle: "Vendas realizadas",
       icon: Award,
       gradient: "from-orange-500 to-red-500",
       bgGradient: "from-orange-50 via-white to-red-50",
       borderColor: "border-orange-200",
-      change: "+5",
-      changeType: "positive",
     },
   ]
 
@@ -125,16 +85,7 @@ export function DashboardStats() {
                     <div className={`p-3 bg-gradient-to-r ${card.gradient} rounded-xl shadow-lg`}>
                       <card.icon className="h-6 w-6 text-white" />
                     </div>
-                    <div>
-                      <p className="text-sm font-semibold text-gray-600">{card.title}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Badge
-                          className={`text-xs ${card.changeType === "positive" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}
-                        >
-                          {card.change}
-                        </Badge>
-                      </div>
-                    </div>
+                    <p className="text-sm font-semibold text-gray-600">{card.title}</p>
                   </div>
                   <div className="space-y-2">
                     <div className="text-3xl font-bold text-gray-900">{card.value}</div>

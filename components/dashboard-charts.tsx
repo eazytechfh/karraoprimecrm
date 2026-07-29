@@ -21,6 +21,7 @@ import {
   AreaChart,
 } from "recharts"
 import { getDashboardData, type DashboardFilters } from "@/lib/dashboard-stats"
+import { DashboardStats } from "@/components/dashboard-stats"
 import { getCurrentUser } from "@/lib/auth"
 import { TrendingUp, Users, Car, Target, Filter, RotateCcw, BarChart3, Activity } from "lucide-react"
 
@@ -260,6 +261,8 @@ export function DashboardCharts() {
           )}
         </CardContent>
       </Card>
+
+      <DashboardStats stats={dashboardData} />
 
       {/* Grid Principal de Gráficos */}
       <div className="grid gap-8 lg:grid-cols-12">

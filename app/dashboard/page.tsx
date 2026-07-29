@@ -4,7 +4,6 @@ import { useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { getCurrentUser } from "@/lib/auth"
 import { SidebarNav } from "@/components/sidebar-nav"
-import { DashboardStats } from "@/components/dashboard-stats"
 import { DashboardCharts } from "@/components/dashboard-charts"
 
 export default function Dashboard() {
@@ -47,11 +46,6 @@ export default function Dashboard() {
 
         <main className="flex-1 overflow-x-hidden overflow-y-auto">
           <div className="w-full px-4 py-8 sm:px-6 xl:px-8">
-            {/* Cards de Estatísticas Básicas com Espaçamento */}
-            <div className="mb-12">
-              <DashboardStats />
-            </div>
-
             {/* Gráficos Interativos */}
             <DashboardCharts />
           </div>
