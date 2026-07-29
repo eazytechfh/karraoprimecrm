@@ -854,27 +854,7 @@ export function AgendamentosKanban() {
   }
 
   const getAgendamentosByStage = (stage: string) => {
-    if (stage !== "visita_realizada") {
-      return filteredAgendamentos.filter((a) => normalizeAgendamentoStage(a.estagio_agendamento) === stage)
-    }
-
-    const realizouVisita = filteredAgendamentos.filter(
-      (a) => normalizeAgendamentoStage(a.estagio_agendamento) === "visita_realizada",
-    )
-    const espelhosVisitaRealizada = filteredAgendamentos
-      .filter((a) => {
-        const estagio = normalizeAgendamentoStage(a.estagio_agendamento)
-        if (!["sucesso", "insucesso"].includes(estagio)) return false
-        const flags = parseCheckboxFlagsFromObservacoes(a.observacoes)
-        return flags.realizouVisita
-      })
-      .map((a) => ({
-        ...a,
-        __mirrorFromVisitaRealizada: true,
-        __mirrorSourceStage: normalizeAgendamentoStage(a.estagio_agendamento),
-      }))
-
-    return [...realizouVisita, ...espelhosVisitaRealizada]
+    return filteredAgendamentos.filter((a) => normalizeAgendamentoStage(a.estagio_agendamento) === stage)
   }
 
   const getPagedAgendamentosByStage = (stage: string) => {
@@ -1362,46 +1342,17 @@ export function AgendamentosKanban() {
                     {agendamentosColuna.length === 0 ? (
                       <p className="text-sm text-muted-foreground text-center py-4">Nenhum agendamento</p>
                     ) : (
-                      agendamentosPaged.map((agendamento: any) =>
-                        agendamento.__mirrorFromVisitaRealizada ? (
-                          <Card
-                            key={`mirror-visita-${agendamento.id}`}
-                            className="transition-all duration-200 cursor-pointer border-green-200 bg-green-50/30"
-                            onClick={() => handleOpenAgendamento(agendamento)}
-                          >
-                            <CardHeader className="p-3 pr-10">
-                              <div className="flex items-start justify-between gap-2">
-                                <div className="flex-1 min-w-0">
-                                  <CardTitle className="text-sm font-medium truncate">{agendamento.nome_lead}</CardTitle>
-                                  {agendamento.telefone && (
-                                    <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-                                      <Phone className="h-3 w-3" />
-                                      {agendamento.telefone}
-                                    </p>
-                                  )}
-                                  <p className="text-xs text-green-700 mt-2">
-                                    Espelho de "
-                                    {ESTAGIO_AGENDAMENTO_LABELS[
-                                      (agendamento.__mirrorSourceStage || agendamento.estagio_agendamento) as keyof typeof ESTAGIO_AGENDAMENTO_LABELS
-                                    ] || agendamento.__mirrorSourceStage || agendamento.estagio_agendamento}
-                                    "
-                                  </p>
-                                </div>
-                              </div>
-                            </CardHeader>
-                          </Card>
-                        ) : (
-                          <DraggableCard
-                            key={agendamento.id}
-                            agendamento={agendamento}
-                            onClick={() => handleOpenAgendamento(agendamento)}
-                            onRealizouVisita={handleRealizouVisita}
-                            onNaoRealizouVisita={handleNaoRealizouVisita}
-                            onVendido={handleVendido}
-                            isMoving={movingAgendamento === agendamento.id}
-                          />
-                        ),
-                      )
+                      agendamentosPaged.map((agendamento) => (
+                        <DraggableCard
+                          key={agendamento.id}
+                          agendamento={agendamento}
+                          onClick={() => handleOpenAgendamento(agendamento)}
+                          onRealizouVisita={handleRealizouVisita}
+                          onNaoRealizouVisita={handleNaoRealizouVisita}
+                          onVendido={handleVendido}
+                          isMoving={movingAgendamento === agendamento.id}
+                        />
+                      ))
                     )}
                     {hasMoreAgendamentos(coluna) && (
                       <button
