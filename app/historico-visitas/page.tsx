@@ -22,6 +22,7 @@ import {
   ESTAGIO_AGENDAMENTO_LABELS,
   normalizeAgendamentoStage,
 } from "@/lib/agendamentos"
+import { getCurrentMonthFullRange } from "@/lib/agendamento-filters"
 import { Calendar, Phone, User, Clock, Filter, Download } from "lucide-react"
 
 const PAGE_SIZE = 50
@@ -36,15 +37,7 @@ type HistoricoFilterParams = {
 }
 
 function getCurrentMonthDateRange() {
-  const now = new Date()
-  const year = now.getFullYear()
-  const month = String(now.getMonth() + 1).padStart(2, "0")
-  const day = String(now.getDate()).padStart(2, "0")
-
-  return {
-    dataInicio: `${year}-${month}-01`,
-    dataFim: `${year}-${month}-${day}`,
-  }
+  return getCurrentMonthFullRange()
 }
 
 function formatDateInput(date: Date) {
@@ -162,6 +155,7 @@ function SdrFunnelTable({ stats }: { stats: SdrStats[] }) {
 
 export default function HistoricoVisitasPage() {
   const router = useRouter()
+  const defaultMonthRange = getCurrentMonthFullRange()
   const [historico, setHistorico] = useState<Agendamento[]>([])
   const [filteredHistorico, setFilteredHistorico] = useState<Agendamento[]>([])
   const [vendedores, setVendedores] = useState<Vendedor[]>([])
@@ -179,8 +173,8 @@ export default function HistoricoVisitasPage() {
     status: "",
     realizouVisita: "",
     ganho: "",
-    dataInicio: "",
-    dataFim: "",
+    dataInicio: defaultMonthRange.dataInicio,
+    dataFim: defaultMonthRange.dataFim,
   })
 
   const currentUser = getCurrentUser()
@@ -285,8 +279,8 @@ export default function HistoricoVisitasPage() {
       status: "",
       realizouVisita: "",
       ganho: "",
-      dataInicio: "",
-      dataFim: "",
+      dataInicio: defaultMonthRange.dataInicio,
+      dataFim: defaultMonthRange.dataFim,
     }
     setFilters(clearedFilters)
     loadData(1, clearedFilters)
