@@ -27,6 +27,7 @@ import {
   ESTAGIO_AGENDAMENTO_COLORS,
   normalizeAgendamentoStage,
 } from "@/lib/agendamentos"
+import { getCurrentMonthFullRange } from "@/lib/agendamento-filters"
 import { getCurrentUser, type User } from "@/lib/auth"
 import {
   Search,
@@ -70,6 +71,7 @@ function buildObservacoesWithCheckboxFlags(observacoes: string | undefined, real
 }
 
 export function AgendamentosListView() {
+  const defaultMonthRange = getCurrentMonthFullRange()
   const [agendamentos, setAgendamentos] = useState<Agendamento[]>([])
   const [filteredAgendamentos, setFilteredAgendamentos] = useState<Agendamento[]>([])
   const [loading, setLoading] = useState(true)
@@ -78,8 +80,8 @@ export function AgendamentosListView() {
   const [filterDataInicio, setFilterDataInicio] = useState("")
   const [filterDataFim, setFilterDataFim] = useState("")
   const [filterVeiculo, setFilterVeiculo] = useState("")
-  const [filterDataAgendamentoInicio, setFilterDataAgendamentoInicio] = useState("")
-  const [filterDataAgendamentoFim, setFilterDataAgendamentoFim] = useState("")
+  const [filterDataAgendamentoInicio, setFilterDataAgendamentoInicio] = useState(defaultMonthRange.dataInicio)
+  const [filterDataAgendamentoFim, setFilterDataAgendamentoFim] = useState(defaultMonthRange.dataFim)
   const [filterVendedor, setFilterVendedor] = useState("")
   const [filterSdrResponsavel, setFilterSdrResponsavel] = useState("")
   const [selectedIds, setSelectedIds] = useState<number[]>([])

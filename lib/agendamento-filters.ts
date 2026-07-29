@@ -43,6 +43,13 @@ function formatDateInput(date: Date) {
   return `${year}-${month}-${day}`
 }
 
+export function getCurrentMonthFullRange(now = new Date()) {
+  return {
+    dataInicio: formatDateInput(new Date(now.getFullYear(), now.getMonth(), 1)),
+    dataFim: formatDateInput(new Date(now.getFullYear(), now.getMonth() + 1, 0)),
+  }
+}
+
 export function resolveAgendamentoDateRange(filters: AgendamentoDateFilters = {}, now = new Date()) {
   if (filters.dataInicio || filters.dataFim) {
     return { startDate: filters.dataInicio, endDate: filters.dataFim }

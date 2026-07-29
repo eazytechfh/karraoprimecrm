@@ -5,6 +5,7 @@ import {
   HISTORICO_AGENDAMENTO_STAGES,
   SDR_FUNNEL_APPOINTMENT_STAGES,
   classifySdrFunnelStage,
+  getCurrentMonthFullRange,
   resolveAgendamentoDateRange,
   resolveHistoricoStages,
 } from "../lib/agendamento-filters.ts"
@@ -42,4 +43,16 @@ test("classifica as etapas do funil SDR pela regra de negocio", () => {
   assert.deepEqual(classifySdrFunnelStage("visita_realizada"), { agendamento: true, visita: true, sucesso: false })
   assert.deepEqual(classifySdrFunnelStage("sucesso"), { agendamento: true, visita: false, sucesso: true })
   assert.deepEqual(classifySdrFunnelStage("insucesso"), { agendamento: false, visita: false, sucesso: false })
+})
+
+test("retorna o primeiro e o ultimo dia do mes atual inteiro", () => {
+  assert.deepEqual(getCurrentMonthFullRange(new Date("2026-07-29T12:00:00Z")), {
+    dataInicio: "2026-07-01",
+    dataFim: "2026-07-31",
+  })
+
+  assert.deepEqual(getCurrentMonthFullRange(new Date("2024-02-10T12:00:00Z")), {
+    dataInicio: "2024-02-01",
+    dataFim: "2024-02-29",
+  })
 })
