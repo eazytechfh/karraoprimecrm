@@ -589,7 +589,9 @@ export default function HistoricoVisitasPage() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center justify-between gap-4">
-                  <span>Visitas ({totalRecords} no total)</span>
+                  <span>
+                    Visitas ({filteredHistorico.length} de {totalRecords} exibidas)
+                  </span>
                   <Button variant="outline" size="sm" onClick={handleExportCSV} className="gap-2 bg-transparent">
                     <Download className="h-4 w-4" />
                     Exportar CSV
@@ -602,9 +604,9 @@ export default function HistoricoVisitasPage() {
                     <p>Nenhuma visita encontrada com os filtros selecionados</p>
                   </div>
                 ) : (
-                  <div className="overflow-x-auto">
+                  <div className="max-h-[640px] overflow-auto rounded-md border">
                     <Table>
-                      <TableHeader>
+                      <TableHeader className="sticky top-0 z-10 bg-white shadow-sm">
                         <TableRow>
                           <TableHead>Cliente</TableHead>
                           <TableHead>Telefone</TableHead>
