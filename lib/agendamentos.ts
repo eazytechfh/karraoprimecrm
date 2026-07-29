@@ -844,7 +844,7 @@ export async function getSdrPerformanceStats(idEmpresa: number, filters?: SdrPer
     agFrom += DASHBOARD_BATCH_SIZE
   }
 
-  // Visitas e sucessos no período selecionado
+  // Visitas (visita realizada + sucesso) e sucessos no período selecionado
   let visitasFrom = 0
   while (true) {
     const visitasTo = visitasFrom + DASHBOARD_BATCH_SIZE - 1

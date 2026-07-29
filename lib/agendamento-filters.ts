@@ -19,7 +19,7 @@ export function classifySdrFunnelStage(stage?: string | null) {
   const normalized = (stage || "").toLowerCase().trim()
   return {
     agendamento: SDR_FUNNEL_APPOINTMENT_STAGES.some((item) => item === normalized),
-    visita: normalized === "visita_realizada",
+    visita: normalized === "visita_realizada" || normalized === "sucesso",
     sucesso: normalized === "sucesso",
   }
 }
