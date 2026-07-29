@@ -161,7 +161,6 @@ function SdrFunnelTable({ stats }: { stats: SdrStats[] }) {
 
 export default function HistoricoVisitasPage() {
   const router = useRouter()
-  const currentMonthRange = getCurrentMonthDateRange()
   const [historico, setHistorico] = useState<Agendamento[]>([])
   const [filteredHistorico, setFilteredHistorico] = useState<Agendamento[]>([])
   const [vendedores, setVendedores] = useState<Vendedor[]>([])
@@ -179,8 +178,8 @@ export default function HistoricoVisitasPage() {
     status: "",
     realizouVisita: "",
     ganho: "",
-    dataInicio: currentMonthRange.dataInicio,
-    dataFim: currentMonthRange.dataFim,
+    dataInicio: "",
+    dataFim: "",
   })
 
   const currentUser = getCurrentUser()
@@ -284,8 +283,8 @@ export default function HistoricoVisitasPage() {
       status: "",
       realizouVisita: "",
       ganho: "",
-      dataInicio: currentMonthRange.dataInicio,
-      dataFim: currentMonthRange.dataFim,
+      dataInicio: "",
+      dataFim: "",
     })
     setTimeout(() => loadData(1), 0)
   }

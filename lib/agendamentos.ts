@@ -87,6 +87,13 @@ function formatDateInput(date: Date) {
 }
 
 function getAgendamentoDateRange(filters?: { dataInicio?: string; dataFim?: string; periodo?: "mes" | "hoje" | "ultimos7dias" }) {
+  if (filters && !filters.dataInicio && !filters.dataFim && !filters.periodo) {
+    return {
+      startDate: undefined,
+      endDate: undefined,
+    }
+  }
+
   if (filters?.dataInicio || filters?.dataFim) {
     return {
       startDate: filters.dataInicio,
