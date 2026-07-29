@@ -5,10 +5,20 @@ import {
   HISTORICO_AGENDAMENTO_STAGES,
   SDR_FUNNEL_APPOINTMENT_STAGES,
   classifySdrFunnelStage,
+  ensureVisitCheckboxFlag,
   getCurrentMonthFullRange,
   resolveAgendamentoDateRange,
   resolveHistoricoStages,
 } from "../lib/agendamento-filters.ts"
+
+test("marca e preserva no banco a flag de visita realizada", () => {
+  assert.equal(ensureVisitCheckboxFlag("Cliente pediu retorno"), "Cliente pediu retorno\n__flags__:rv=1;g=0")
+  assert.equal(
+    ensureVisitCheckboxFlag("Cliente pediu retorno\n__flags__:rv=0;g=1"),
+    "Cliente pediu retorno\n__flags__:rv=1;g=1",
+  )
+  assert.equal(ensureVisitCheckboxFlag("__flags__:rv=1;g=0"), "__flags__:rv=1;g=0")
+})
 
 test("o historico geral inclui agendamentos confirmados", () => {
   assert.ok(HISTORICO_AGENDAMENTO_STAGES.includes("agendado"))

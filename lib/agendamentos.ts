@@ -3,6 +3,7 @@ import {
   HISTORICO_AGENDAMENTO_STAGES,
   SDR_FUNNEL_APPOINTMENT_STAGES,
   classifySdrFunnelStage,
+  ensureVisitCheckboxFlag,
   resolveAgendamentoDateRange,
   resolveHistoricoStages,
 } from "@/lib/agendamento-filters"
@@ -371,7 +372,11 @@ export async function updateAgendamentoStage(id: number, novoEstagio: string): P
 
   const estagioAtual = normalizeAgendamentoStage(agendamento.estagio_agendamento)
   const estagioNovo = normalizeAgendamentoStage(novoEstagio)
-  const result = await updateAgendamento(id, { estagio_agendamento: estagioNovo })
+  const updates: Partial<Agendamento> = { estagio_agendamento: estagioNovo }
+  if (estagioNovo === "visita_realizada") {
+    updates.observacoes = ensureVisitCheckboxFlag(agendamento.observacoes)
+  }
+  const result = await updateAgendamento(id, updates)
 
   if (result && estagioNovo === "agendado") {
     await sendNotificaVendedorWebhook(agendamento)
@@ -413,6 +418,10 @@ export async function updateAgendamentoStageWithMotivo(
   const estagioAtual = normalizeAgendamentoStage(agendamento.estagio_agendamento)
   const estagioNovo = normalizeAgendamentoStage(novoEstagio)
   const updates: Partial<Agendamento> = { estagio_agendamento: estagioNovo }
+
+  if (estagioNovo === "visita_realizada") {
+    updates.observacoes = ensureVisitCheckboxFlag(agendamento.observacoes)
+  }
 
   if (estagioNovo === "insucesso" && motivoPerda) {
     updates.motivo_perda = motivoPerda
@@ -903,7 +912,10 @@ export async function marcarRealizouVisita(id: number): Promise<boolean> {
     return false
   }
 
-  const result = await updateAgendamento(id, { estagio_agendamento: "visita_realizada" })
+  const result = await updateAgendamento(id, {
+    estagio_agendamento: "visita_realizada",
+    observacoes: ensureVisitCheckboxFlag(agendamento.observacoes),
+  })
 
   if (result) {
     await registrarHistoricoMovimentacao(

@@ -16,6 +16,21 @@ export const SDR_FUNNEL_APPOINTMENT_STAGES = [
   "insucesso",
 ] as const
 
+const CHECKBOX_FLAGS_PATTERN = /__flags__:rv=(0|1);g=(0|1)/
+
+export function ensureVisitCheckboxFlag(observacoes?: string) {
+  const raw = observacoes || ""
+  const match = raw.match(CHECKBOX_FLAGS_PATTERN)
+  const ganho = match?.[2] === "1"
+  const base = raw
+    .replace(/\n?__flags__:rv=(0|1);g=(0|1)\n?/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim()
+  const flags = `__flags__:rv=1;g=${ganho ? "1" : "0"}`
+
+  return base ? `${base}\n${flags}` : flags
+}
+
 export function classifySdrFunnelStage(stage?: string | null, realizouVisitaMarcada = false) {
   const normalized = (stage || "").toLowerCase().trim()
   return {

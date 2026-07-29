@@ -37,7 +37,7 @@ import {
   marcarRealizouVisita,
   reagendarVisita,
 } from "@/lib/agendamentos"
-import { getCurrentMonthFullRange } from "@/lib/agendamento-filters"
+import { ensureVisitCheckboxFlag, getCurrentMonthFullRange } from "@/lib/agendamento-filters"
 import { getCurrentUser, canEditCards, type User } from "@/lib/auth"
 import {
   Search,
@@ -410,6 +410,10 @@ export function AgendamentosKanban() {
         email: agendamento.email,
         modelo_veiculo: agendamento.modelo_veiculo,
         estagio_agendamento: newStage,
+        observacoes:
+          newStage === "visita_realizada"
+            ? ensureVisitCheckboxFlag(agendamento.observacoes)
+            : agendamento.observacoes,
         sdr_responsavel: agendamento.sdr_responsavel,
         vendedor: agendamento.vendedor,
       })
@@ -464,6 +468,8 @@ export function AgendamentosKanban() {
           ? {
               ...a,
               estagio_agendamento: newStage,
+              observacoes:
+                newStage === "visita_realizada" ? ensureVisitCheckboxFlag(a.observacoes) : a.observacoes,
               updated_at: new Date().toISOString(),
               motivo_perda: motivoPerda || a.motivo_perda,
               data_perda: newStage === "insucesso" ? new Date().toISOString().split("T")[0] : a.data_perda,
@@ -477,7 +483,11 @@ export function AgendamentosKanban() {
 
       if (!success) {
         setAgendamentos((prev) =>
-          prev.map((a) => (a.id === agendamentoId ? { ...a, estagio_agendamento: oldStage } : a)),
+          prev.map((a) =>
+            a.id === agendamentoId
+              ? { ...a, estagio_agendamento: oldStage, observacoes: agendamento?.observacoes }
+              : a,
+          ),
         )
 
         setStatusMessage({
@@ -525,7 +535,13 @@ export function AgendamentosKanban() {
         }
       }
     } catch (error) {
-      setAgendamentos((prev) => prev.map((a) => (a.id === agendamentoId ? { ...a, estagio_agendamento: oldStage } : a)))
+      setAgendamentos((prev) =>
+        prev.map((a) =>
+          a.id === agendamentoId
+            ? { ...a, estagio_agendamento: oldStage, observacoes: agendamento?.observacoes }
+            : a,
+        ),
+      )
       setStatusMessage({
         type: "error",
         text: "Erro ao mover o agendamento",
@@ -630,7 +646,7 @@ export function AgendamentosKanban() {
     const parsed = parseCheckboxFlagsFromObservacoes(agendamento.observacoes)
     const normalizedStage = normalizeAgendamentoStage(agendamento.estagio_agendamento)
     const isGanho = parsed.hasFlags ? parsed.ganho : normalizedStage === "sucesso"
-    const isRealizouVisita = parsed.hasFlags ? parsed.realizouVisita : normalizedStage === "visita_realizada"
+    const isRealizouVisita = normalizedStage === "visita_realizada" || parsed.realizouVisita
 
     setSelectedAgendamento(agendamento)
     setFormData({
@@ -658,6 +674,9 @@ export function AgendamentosKanban() {
       console.log("[v0] Saving agendamento:", selectedAgendamento.id)
       console.log("[v0] Edited data:", editedAgendamento)
 
+      const isVisitaRealizadaStage =
+        normalizeAgendamentoStage(selectedAgendamento.estagio_agendamento) === "visita_realizada"
+      const realizouVisita = isVisitaRealizadaStage || formData.realizou_visita
       const updates: Partial<Agendamento> = {
         nome_lead: editedAgendamento.nome_lead ?? selectedAgendamento.nome_lead,
         telefone: editedAgendamento.telefone ?? selectedAgendamento.telefone,
@@ -668,7 +687,7 @@ export function AgendamentosKanban() {
         vendedor: editedAgendamento.vendedor ?? selectedAgendamento.vendedor,
         observacoes: buildObservacoesWithCheckboxFlags(
           editedAgendamento.observacoes ?? formData.observacoes ?? selectedAgendamento.observacoes,
-          formData.realizou_visita,
+          realizouVisita,
           formData.ganho,
         ),
       }
@@ -687,7 +706,7 @@ export function AgendamentosKanban() {
 
       if (formData.ganho) {
         updates.estagio_agendamento = "sucesso"
-      } else if (formData.realizou_visita) {
+      } else if (realizouVisita) {
         updates.estagio_agendamento = "visita_realizada"
       } else if (hasRequiredFields) {
         updates.estagio_agendamento = "agendado"
@@ -973,7 +992,12 @@ export function AgendamentosKanban() {
     setAgendamentos((prev) =>
       prev.map((a) =>
         a.id === agendamento.id
-          ? { ...a, estagio_agendamento: "visita_realizada", updated_at: new Date().toISOString() }
+          ? {
+              ...a,
+              estagio_agendamento: "visita_realizada",
+              observacoes: ensureVisitCheckboxFlag(a.observacoes),
+              updated_at: new Date().toISOString(),
+            }
           : a,
       ),
     )
@@ -988,7 +1012,11 @@ export function AgendamentosKanban() {
         })
       } else {
         setAgendamentos((prev) =>
-          prev.map((a) => (a.id === agendamento.id ? { ...a, estagio_agendamento: "agendado" } : a)),
+          prev.map((a) =>
+            a.id === agendamento.id
+              ? { ...a, estagio_agendamento: "agendado", observacoes: agendamento.observacoes }
+              : a,
+          ),
         )
         setStatusMessage({
           type: "error",
@@ -997,7 +1025,11 @@ export function AgendamentosKanban() {
       }
     } catch (error) {
       setAgendamentos((prev) =>
-        prev.map((a) => (a.id === agendamento.id ? { ...a, estagio_agendamento: "agendado" } : a)),
+        prev.map((a) =>
+          a.id === agendamento.id
+            ? { ...a, estagio_agendamento: "agendado", observacoes: agendamento.observacoes }
+            : a,
+        ),
       )
       setStatusMessage({
         type: "error",
@@ -1555,7 +1587,10 @@ export function AgendamentosKanban() {
                             ganho: e.target.checked ? prev.ganho : false,
                           }))
                         }
-                        disabled={!canEdit}
+                        disabled={
+                          !canEdit ||
+                          normalizeAgendamentoStage(selectedAgendamento.estagio_agendamento) === "visita_realizada"
+                        }
                       />
                       Visita Realizada
                     </label>
