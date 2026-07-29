@@ -12,6 +12,7 @@ export const SDR_FUNNEL_APPOINTMENT_STAGES = [
   "agendado",
   "reagendado",
   "visita_realizada",
+  "sucesso",
 ] as const
 
 export function classifySdrFunnelStage(stage?: string | null) {

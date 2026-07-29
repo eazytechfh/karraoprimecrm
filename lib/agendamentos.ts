@@ -805,7 +805,7 @@ export async function getSdrPerformanceStats(idEmpresa: number, filters?: SdrPer
     leadsFrom += DASHBOARD_BATCH_SIZE
   }
 
-  // Agendamentos por SDR: agendado, reagendado e visita realizada
+  // Agendamentos por SDR: agendado, reagendado, visita realizada e sucesso
   let agFrom = 0
   while (true) {
     const agTo = agFrom + DASHBOARD_BATCH_SIZE - 1
