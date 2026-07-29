@@ -853,8 +853,27 @@ export function AgendamentosKanban() {
     }
   }
 
-  const getAgendamentosByStage = (stage: string) => {
+  const getActualAgendamentosByStage = (stage: string) => {
     return filteredAgendamentos.filter((a) => normalizeAgendamentoStage(a.estagio_agendamento) === stage)
+  }
+
+  const getAgendamentosByStage = (stage: string) => {
+    const actual = getActualAgendamentosByStage(stage)
+    if (stage !== "visita_realizada") return actual
+
+    const mirrors = filteredAgendamentos
+      .filter((a) => {
+        const currentStage = normalizeAgendamentoStage(a.estagio_agendamento)
+        if (!["sucesso", "insucesso"].includes(currentStage)) return false
+        return parseCheckboxFlagsFromObservacoes(a.observacoes).realizouVisita
+      })
+      .map((a) => ({
+        ...a,
+        __mirrorFromVisitaRealizada: true,
+        __mirrorSourceStage: normalizeAgendamentoStage(a.estagio_agendamento),
+      }))
+
+    return [...actual, ...mirrors]
   }
 
   const getPagedAgendamentosByStage = (stage: string) => {
@@ -1310,8 +1329,10 @@ export function AgendamentosKanban() {
       <DndContext onDragEnd={handleDragEnd}>
         <div className="flex gap-3 pb-4 overflow-x-auto">
           {COLUNAS_KANBAN_AGENDAMENTOS.map((coluna) => {
-            const agendamentosColuna = getAgendamentosByStage(coluna)
+            const agendamentosColuna = getActualAgendamentosByStage(coluna)
+            const agendamentosExibidos = getAgendamentosByStage(coluna)
             const agendamentosPaged = getPagedAgendamentosByStage(coluna)
+            const mirrorCount = agendamentosExibidos.length - agendamentosColuna.length
             const total = agendamentosColuna.reduce((sum, a) => sum + Number(a.valor_venda || 0), 0)
 
             return (
@@ -1330,6 +1351,9 @@ export function AgendamentosKanban() {
                         <Badge variant="secondary" className="font-mono">
                           {agendamentosColuna.length}
                         </Badge>
+                        {mirrorCount > 0 && (
+                          <span className="text-[10px] text-muted-foreground">+{mirrorCount} espelhos</span>
+                        )}
                         {coluna === "sucesso" && total > 0 && (
                           <Badge variant="default" className="text-xs bg-green-600">
                             R$ {total.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -1339,27 +1363,56 @@ export function AgendamentosKanban() {
                     </div>
                   </CardHeader>
                   <CardContent className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-2">
-                    {agendamentosColuna.length === 0 ? (
+                    {agendamentosExibidos.length === 0 ? (
                       <p className="text-sm text-muted-foreground text-center py-4">Nenhum agendamento</p>
                     ) : (
-                      agendamentosPaged.map((agendamento) => (
-                        <DraggableCard
-                          key={agendamento.id}
-                          agendamento={agendamento}
-                          onClick={() => handleOpenAgendamento(agendamento)}
-                          onRealizouVisita={handleRealizouVisita}
-                          onNaoRealizouVisita={handleNaoRealizouVisita}
-                          onVendido={handleVendido}
-                          isMoving={movingAgendamento === agendamento.id}
-                        />
-                      ))
+                      agendamentosPaged.map((agendamento: any) =>
+                        agendamento.__mirrorFromVisitaRealizada ? (
+                          <Card
+                            key={`mirror-visita-${agendamento.id}`}
+                            className="cursor-pointer border-green-200 bg-green-50/30 transition-all duration-200"
+                            onClick={() => handleOpenAgendamento(agendamento)}
+                          >
+                            <CardHeader className="p-3 pr-10">
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0 flex-1">
+                                  <CardTitle className="truncate text-sm font-medium">{agendamento.nome_lead}</CardTitle>
+                                  {agendamento.telefone && (
+                                    <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+                                      <Phone className="h-3 w-3" />
+                                      {agendamento.telefone}
+                                    </p>
+                                  )}
+                                  <p className="mt-2 text-xs text-green-700">
+                                    Espelho de{" "}
+                                    {ESTAGIO_AGENDAMENTO_LABELS[
+                                      agendamento.__mirrorSourceStage as keyof typeof ESTAGIO_AGENDAMENTO_LABELS
+                                    ] || agendamento.__mirrorSourceStage}
+                                  </p>
+                                </div>
+                              </div>
+                            </CardHeader>
+                          </Card>
+                        ) : (
+                          <DraggableCard
+                            key={agendamento.id}
+                            agendamento={agendamento}
+                            onClick={() => handleOpenAgendamento(agendamento)}
+                            onRealizouVisita={handleRealizouVisita}
+                            onNaoRealizouVisita={handleNaoRealizouVisita}
+                            onVendido={handleVendido}
+                            isMoving={movingAgendamento === agendamento.id}
+                          />
+                        ),
+                      )
                     )}
                     {hasMoreAgendamentos(coluna) && (
                       <button
                         onClick={() => loadMoreAgendamentos(coluna)}
                         className="w-full mt-1 py-2 text-xs text-blue-500 hover:text-blue-700 border border-dashed border-blue-300 hover:border-blue-500 rounded-lg transition-colors"
                       >
-                        Carregar mais ({agendamentosColuna.length - (kanbanPages[coluna] || 1) * KANBAN_PAGE_SIZE} restantes)
+                        Carregar mais (
+                        {agendamentosExibidos.length - (kanbanPages[coluna] || 1) * KANBAN_PAGE_SIZE} restantes)
                       </button>
                     )}
                   </CardContent>
