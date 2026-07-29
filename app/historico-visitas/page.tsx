@@ -518,6 +518,8 @@ export default function HistoricoVisitasPage() {
                         <SelectValue placeholder="Todos os status" />
                       </SelectTrigger>
                       <SelectContent>
+                        <SelectItem value="agendar">Agendar</SelectItem>
+                        <SelectItem value="agendado">Agendado</SelectItem>
                         <SelectItem value="visita_realizada">Visita Realizada</SelectItem>
                         <SelectItem value="nao_compareceu">Não Compareceu</SelectItem>
                         <SelectItem value="reagendado">Reagendado</SelectItem>
