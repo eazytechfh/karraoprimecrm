@@ -54,6 +54,11 @@ export interface AgendamentoDateFilters {
   periodo?: "mes" | "hoje" | "ultimos7dias"
 }
 
+export interface AgendamentoDateCandidate {
+  data_agendamento?: string | null
+  estagio_agendamento?: string | null
+}
+
 function formatDateInput(date: Date) {
   const year = date.getFullYear()
   const month = String(date.getMonth() + 1).padStart(2, "0")
@@ -66,6 +71,24 @@ export function getCurrentMonthFullRange(now = new Date()) {
     dataInicio: formatDateInput(new Date(now.getFullYear(), now.getMonth(), 1)),
     dataFim: formatDateInput(new Date(now.getFullYear(), now.getMonth() + 1, 0)),
   }
+}
+
+export function isAgendamentoWithinDateRange(
+  agendamento: AgendamentoDateCandidate,
+  startDate?: string,
+  endDate?: string,
+) {
+  if (!startDate && !endDate) return true
+
+  const appointmentDate = agendamento.data_agendamento?.slice(0, 10)
+  const stage = (agendamento.estagio_agendamento || "").toLowerCase().trim()
+
+  // "Agendar" e uma fila de trabalho: leads novos ainda nao possuem data e
+  // precisam continuar visiveis mesmo quando o mes atual esta selecionado.
+  if (!appointmentDate) return stage === "agendar"
+  if (startDate && appointmentDate < startDate) return false
+  if (endDate && appointmentDate > endDate) return false
+  return true
 }
 
 export function resolveAgendamentoDateRange(filters: AgendamentoDateFilters = {}, now = new Date()) {

@@ -2,6 +2,10 @@ import { createClient } from "@/utils/supabase/client"
 import { getCurrentUser } from "@/lib/auth"
 import { registerLeadHistory } from "@/lib/lead-history"
 import { normalizeAgendamentoStage } from "@/lib/agendamentos"
+import {
+  resolveLeadEntryAgendamentoStage,
+  shouldCreateAgendamentoForLeadStage,
+} from "@/lib/lead-agendamento-policy"
 
 export interface Lead {
   id: number
@@ -188,18 +192,25 @@ async function fetchLatestAgendamentoStageByLead(
   return latestStageByLead
 }
 
-async function ensureAgendamentoForLead(
+export interface EnsureAgendamentoResult {
+  success: boolean
+  action?: "created" | "updated"
+  error?: unknown
+}
+
+export async function ensureAgendamentoForLead(
   lead: Pick<
     Lead,
     "id" | "id_empresa" | "nome_lead" | "telefone" | "email" | "veiculo_interesse" | "vendedor" | "sdr_responsavel"
   >,
-  forceStage = false,
-) {
+  resetToAgendar = false,
+): Promise<EnsureAgendamentoResult> {
   const supabase = createClient()
 
   const { data: existingAgendamento, error: existingError } = await supabase
     .from("AGENDAMENTOS")
     .select("id, vendedor, sdr_responsavel, estagio_agendamento")
+    .eq("id_empresa", lead.id_empresa)
     .eq("id_lead", lead.id)
     .order("created_at", { ascending: false })
     .limit(1)
@@ -207,7 +218,7 @@ async function ensureAgendamentoForLead(
 
   if (existingError) {
     console.error("Error checking existing agendamento:", existingError)
-    return
+    return { success: false, error: existingError }
   }
 
   const now = new Date().toISOString()
@@ -219,16 +230,18 @@ async function ensureAgendamentoForLead(
       updated_at: now,
     }
 
-    if (forceStage) {
-      updates.estagio_agendamento = "agendar"
-    }
+    updates.estagio_agendamento = resolveLeadEntryAgendamentoStage(
+      existingAgendamento.estagio_agendamento,
+      resetToAgendar,
+    )
 
     const { error: updateError } = await supabase.from("AGENDAMENTOS").update(updates).eq("id", existingAgendamento.id)
 
     if (updateError) {
       console.error("Error updating agendamento:", updateError)
+      return { success: false, error: updateError }
     }
-    return
+    return { success: true, action: "updated" }
   }
 
   const { error: insertError } = await supabase.from("AGENDAMENTOS").insert({
@@ -247,7 +260,10 @@ async function ensureAgendamentoForLead(
 
   if (insertError) {
     console.error("Error creating agendamento for lead:", insertError)
+    return { success: false, error: insertError }
   }
+
+  return { success: true, action: "created" }
 }
 
 export async function getAccurateLeadStats(idEmpresa: number) {
@@ -326,10 +342,18 @@ export async function getLeads(idEmpresa: number): Promise<Lead[]> {
 
   try {
     const data = await fetchAllLeadsRows(idEmpresa, user)
-    const latestAgendamentoStageByLead = await fetchLatestAgendamentoStageByLead(
-      idEmpresa,
-      data.filter((lead) => normalizeLeadStage(lead.estagio_lead) === "vendedor").map((lead) => lead.id),
-    )
+    let latestAgendamentoStageByLead: Record<number, string> = {}
+
+    try {
+      latestAgendamentoStageByLead = await fetchLatestAgendamentoStageByLead(
+        idEmpresa,
+        data.filter((lead) => normalizeLeadStage(lead.estagio_lead) === "vendedor").map((lead) => lead.id),
+      )
+    } catch (agendamentoError) {
+      // A consulta de agendamentos complementa a exibicao, mas nao pode
+      // apagar todo o funil de negociacoes quando estiver indisponivel.
+      console.error("Error fetching appointment stages for leads:", agendamentoError)
+    }
 
     return data
       .map((lead) => ({
@@ -425,8 +449,10 @@ export async function updateLeadStage(leadId: number, newStage: string): Promise
       updatedLead: data[0],
     })
 
-    if (newStage === "em_qualificacao" || newStage === "vendedor") {
-      await ensureAgendamentoForLead(
+    if (shouldCreateAgendamentoForLeadStage(newStage)) {
+      const enteredStage =
+        normalizeLeadStage(leadData.estagio_lead) !== normalizeLeadStage(newStage)
+      const agendamentoResult = await ensureAgendamentoForLead(
         {
           id: leadData.id,
           id_empresa: leadData.id_empresa,
@@ -437,8 +463,17 @@ export async function updateLeadStage(leadId: number, newStage: string): Promise
           vendedor: leadData.vendedor,
           sdr_responsavel: sdrResponsavel || leadData.sdr_responsavel,
         },
-        newStage === "em_qualificacao",
+        enteredStage,
       )
+
+      if (!agendamentoResult.success) {
+        console.error("Lead atualizado, mas o agendamento nao foi sincronizado:", {
+          leadId,
+          newStage,
+          error: agendamentoResult.error,
+        })
+        return false
+      }
     }
 
     const currentUser = getCurrentUser()

@@ -37,7 +37,10 @@ import {
   marcarRealizouVisita,
   reagendarVisita,
 } from "@/lib/agendamentos"
-import { ensureVisitCheckboxFlag, getCurrentMonthFullRange } from "@/lib/agendamento-filters"
+import {
+  ensureVisitCheckboxFlag,
+  isAgendamentoWithinDateRange,
+} from "@/lib/agendamento-filters"
 import { getCurrentUser, canEditCards, type User } from "@/lib/auth"
 import {
   Search,
@@ -232,7 +235,6 @@ function DroppableColumn({ stage, children }: { stage: string; children: React.R
 }
 
 export function AgendamentosKanban() {
-  const defaultMonthRange = getCurrentMonthFullRange()
   const [agendamentos, setAgendamentos] = useState<Agendamento[]>([])
   const [filteredAgendamentos, setFilteredAgendamentos] = useState<Agendamento[]>([])
   const [loading, setLoading] = useState(true)
@@ -244,8 +246,8 @@ export function AgendamentosKanban() {
   const [filterRealizouVisita, setFilterRealizouVisita] = useState("all")
   const [filterGanho, setFilterGanho] = useState("all")
   const [filterSdr, setFilterSdr] = useState("all")
-  const [filterDataAgendamentoInicio, setFilterDataAgendamentoInicio] = useState(defaultMonthRange.dataInicio)
-  const [filterDataAgendamentoFim, setFilterDataAgendamentoFim] = useState(defaultMonthRange.dataFim)
+  const [filterDataAgendamentoInicio, setFilterDataAgendamentoInicio] = useState("")
+  const [filterDataAgendamentoFim, setFilterDataAgendamentoFim] = useState("")
   const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
   const [movingAgendamento, setMovingAgendamento] = useState<number | null>(null)
   const [deletingAgendamento, setDeletingAgendamento] = useState<number | null>(null)
@@ -354,12 +356,10 @@ export function AgendamentosKanban() {
       filtered = filtered.filter((a) => a.sdr_responsavel === filterSdr)
     }
 
-    if (filterDataAgendamentoInicio) {
-      filtered = filtered.filter((a) => a.data_agendamento && a.data_agendamento >= filterDataAgendamentoInicio)
-    }
-
-    if (filterDataAgendamentoFim) {
-      filtered = filtered.filter((a) => a.data_agendamento && a.data_agendamento <= filterDataAgendamentoFim)
+    if (filterDataAgendamentoInicio || filterDataAgendamentoFim) {
+      filtered = filtered.filter((a) =>
+        isAgendamentoWithinDateRange(a, filterDataAgendamentoInicio, filterDataAgendamentoFim),
+      )
     }
 
     setFilteredAgendamentos(filtered)

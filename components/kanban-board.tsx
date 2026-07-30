@@ -52,6 +52,7 @@ import {
   ESTAGIO_COLORS,
   VALID_ESTAGIOS,
   formatCurrency,
+  ensureAgendamentoForLead,
 } from "@/lib/leads"
 import { getCurrentUser } from "@/lib/auth"
 import { createClient } from "@/utils/supabase/client"
@@ -242,64 +243,6 @@ export function KanbanBoard() {
     setLoading(false)
   }
 
-  const ensureAgendamentoForLead = async (
-    lead: Partial<Lead> & { id: number },
-    vendedorOverride?: string,
-    forceStage = false,
-  ) => {
-    const supabase = createClient()
-    const vendedor = vendedorOverride ?? lead.vendedor
-
-    const { data: existingAgendamento, error: existingError } = await supabase
-      .from("AGENDAMENTOS")
-      .select("id, vendedor")
-      .eq("id_lead", lead.id)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle()
-
-    if (existingError) {
-      console.error("[v0] Error checking existing agendamento:", existingError)
-      return
-    }
-
-    if (existingAgendamento) {
-      const { error: updateError } = await supabase
-        .from("AGENDAMENTOS")
-        .update({
-          vendedor: vendedor || null,
-          sdr_responsavel: lead.sdr_responsavel || null,
-          ...(forceStage ? { estagio_agendamento: "agendar" } : {}),
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", existingAgendamento.id)
-
-      if (updateError) {
-        console.error("[v0] Error updating agendamento vendedor:", updateError)
-      }
-      return
-    }
-
-    const user = getCurrentUser()
-    const { error: insertError } = await supabase.from("AGENDAMENTOS").insert({
-      id_empresa: user?.id_empresa,
-      id_lead: lead.id,
-      nome_lead: lead.nome_lead || "Lead sem nome",
-      telefone: lead.telefone || null,
-      email: lead.email || null,
-      modelo_veiculo: lead.veiculo_interesse || null,
-      vendedor: vendedor || null,
-      sdr_responsavel: lead.sdr_responsavel || null,
-      estagio_agendamento: "agendar",
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    })
-
-    if (insertError) {
-      console.error("[v0] Error creating agendamento for lead:", insertError)
-    }
-  }
-
   const filterLeads = () => {
     let filtered = [...leads]
 
@@ -426,11 +369,6 @@ export function KanbanBoard() {
         console.log("Lead moved successfully")
 
         if ((newStage === "vendedor" || newStage === "em_qualificacao") && leadData) {
-          await ensureAgendamentoForLead(
-            leadData,
-            newStage === "vendedor" ? leadData.vendedor : undefined,
-            newStage === "em_qualificacao",
-          )
           setResumoMessage({
             type: "success",
             text:
@@ -974,7 +912,7 @@ export function KanbanBoard() {
       if (response.ok) {
         // Update the lead's vendedor and move to "vendedor" stage in the database
         const supabaseClient = createClient()
-        await supabaseClient
+        const { error: leadUpdateError } = await supabaseClient
           .from("BASE_DE_LEADS")
           .update({
             vendedor: selectedVendedor,
@@ -983,7 +921,22 @@ export function KanbanBoard() {
           })
           .eq("id", leadToTransfer.id)
 
-        await ensureAgendamentoForLead(leadToTransfer, selectedVendedor)
+        if (leadUpdateError) {
+          throw leadUpdateError
+        }
+
+        const agendamentoResult = await ensureAgendamentoForLead(
+          {
+            ...leadToTransfer,
+            id_empresa: leadToTransfer.id_empresa,
+            vendedor: selectedVendedor,
+          },
+          true,
+        )
+
+        if (!agendamentoResult.success) {
+          throw new Error("Lead transferido, mas nao foi possivel sincronizar o agendamento.")
+        }
 
         // Update the lead's vendedor and stage in local state
         setLeads((prevLeads) =>

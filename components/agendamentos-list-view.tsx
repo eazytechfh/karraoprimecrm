@@ -27,7 +27,7 @@ import {
   ESTAGIO_AGENDAMENTO_COLORS,
   normalizeAgendamentoStage,
 } from "@/lib/agendamentos"
-import { getCurrentMonthFullRange } from "@/lib/agendamento-filters"
+import { isAgendamentoWithinDateRange } from "@/lib/agendamento-filters"
 import { getCurrentUser, type User } from "@/lib/auth"
 import {
   Search,
@@ -71,7 +71,6 @@ function buildObservacoesWithCheckboxFlags(observacoes: string | undefined, real
 }
 
 export function AgendamentosListView() {
-  const defaultMonthRange = getCurrentMonthFullRange()
   const [agendamentos, setAgendamentos] = useState<Agendamento[]>([])
   const [filteredAgendamentos, setFilteredAgendamentos] = useState<Agendamento[]>([])
   const [loading, setLoading] = useState(true)
@@ -80,8 +79,8 @@ export function AgendamentosListView() {
   const [filterDataInicio, setFilterDataInicio] = useState("")
   const [filterDataFim, setFilterDataFim] = useState("")
   const [filterVeiculo, setFilterVeiculo] = useState("")
-  const [filterDataAgendamentoInicio, setFilterDataAgendamentoInicio] = useState(defaultMonthRange.dataInicio)
-  const [filterDataAgendamentoFim, setFilterDataAgendamentoFim] = useState(defaultMonthRange.dataFim)
+  const [filterDataAgendamentoInicio, setFilterDataAgendamentoInicio] = useState("")
+  const [filterDataAgendamentoFim, setFilterDataAgendamentoFim] = useState("")
   const [filterVendedor, setFilterVendedor] = useState("")
   const [filterSdrResponsavel, setFilterSdrResponsavel] = useState("")
   const [selectedIds, setSelectedIds] = useState<number[]>([])
@@ -212,18 +211,10 @@ export function AgendamentosListView() {
       filtered = filtered.filter((a) => a.modelo_veiculo?.toLowerCase().includes(filterVeiculo.toLowerCase()))
     }
 
-    if (filterDataAgendamentoInicio) {
-      filtered = filtered.filter((a) => {
-        if (!a.data_agendamento) return false
-        return a.data_agendamento >= filterDataAgendamentoInicio
-      })
-    }
-
-    if (filterDataAgendamentoFim) {
-      filtered = filtered.filter((a) => {
-        if (!a.data_agendamento) return false
-        return a.data_agendamento <= filterDataAgendamentoFim
-      })
+    if (filterDataAgendamentoInicio || filterDataAgendamentoFim) {
+      filtered = filtered.filter((a) =>
+        isAgendamentoWithinDateRange(a, filterDataAgendamentoInicio, filterDataAgendamentoFim),
+      )
     }
 
     if (filterVendedor && filterVendedor !== "all") {

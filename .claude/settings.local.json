@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git config *)",
+      "Bash(gh auth *)",
+      "Bash(cmdkey /list)",
+      "Bash(git fetch *)"
+    ]
+  }
+}

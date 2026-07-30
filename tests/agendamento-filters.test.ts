@@ -7,6 +7,7 @@ import {
   classifySdrFunnelStage,
   ensureVisitCheckboxFlag,
   getCurrentMonthFullRange,
+  isAgendamentoWithinDateRange,
   resolveAgendamentoDateRange,
   resolveHistoricoStages,
 } from "../lib/agendamento-filters.ts"
@@ -73,4 +74,45 @@ test("retorna o primeiro e o ultimo dia do mes atual inteiro", () => {
     dataInicio: "2024-02-01",
     dataFim: "2024-02-29",
   })
+})
+
+test("mantem leads sem data visiveis na fila Agendar", () => {
+  assert.equal(
+    isAgendamentoWithinDateRange(
+      { estagio_agendamento: "agendar", data_agendamento: null },
+      "2026-07-01",
+      "2026-07-31",
+    ),
+    true,
+  )
+})
+
+test("oculta registros sem data fora da fila Agendar quando ha periodo", () => {
+  assert.equal(
+    isAgendamentoWithinDateRange(
+      { estagio_agendamento: "agendado", data_agendamento: null },
+      "2026-07-01",
+      "2026-07-31",
+    ),
+    false,
+  )
+})
+
+test("compara somente a data quando o banco retorna timestamp", () => {
+  assert.equal(
+    isAgendamentoWithinDateRange(
+      { estagio_agendamento: "agendado", data_agendamento: "2026-07-31T18:30:00Z" },
+      "2026-07-01",
+      "2026-07-31",
+    ),
+    true,
+  )
+  assert.equal(
+    isAgendamentoWithinDateRange(
+      { estagio_agendamento: "agendado", data_agendamento: "2026-08-01T00:00:00Z" },
+      "2026-07-01",
+      "2026-07-31",
+    ),
+    false,
+  )
 })
