@@ -26,6 +26,7 @@ import {
   VALID_ESTAGIOS_AGENDAMENTO,
   normalizeAgendamentoStage,
   updateAgendamento,
+  updateAgendamentoSdr,
   updateAgendamentoStageWithMotivo,
   type MotivoPerda,
   canMoveStage,
@@ -268,6 +269,7 @@ export function AgendamentosKanban() {
     data_agendamento: "",
     hora_agendamento: "",
     vendedor: "",
+    sdr_responsavel: "",
     observacoes: "",
     observacoes_vendedor: "", // Novo campo
     email: "", // Novo campo
@@ -654,6 +656,7 @@ export function AgendamentosKanban() {
       data_agendamento: agendamento.data_agendamento || "",
       hora_agendamento: agendamento.hora_agendamento || "",
       vendedor: agendamento.vendedor || "",
+      sdr_responsavel: agendamento.sdr_responsavel || "",
       observacoes: parsed.cleanObservacoes || "",
       observacoes_vendedor: agendamento.observacoes_vendedor || "",
       email: agendamento.email || "", // Novo campo
@@ -729,11 +732,18 @@ export function AgendamentosKanban() {
           vendedor: updates.vendedor,
           observacoes: updates.observacoes,
           estagio_agendamento: updates.estagio_agendamento || "agendar",
-          sdr_responsavel: selectedAgendamento.sdr_responsavel,
+          sdr_responsavel: formData.sdr_responsavel || selectedAgendamento.sdr_responsavel,
         })
 
         if (newAgendamento) {
           console.log("[v0] Virtual lead converted to real agendamento successfully")
+
+          if (formData.sdr_responsavel) {
+            const sdrUpdated = await updateAgendamentoSdr(newAgendamento, formData.sdr_responsavel)
+            if (!sdrUpdated) {
+              throw new Error("Nao foi possivel sincronizar o SDR do lead.")
+            }
+          }
 
           if (hasRequiredFields && currentUser) {
             await registrarHistoricoMovimentacao(
@@ -773,6 +783,16 @@ export function AgendamentosKanban() {
       const success = await updateAgendamento(selectedAgendamento.id, updates)
 
       if (success) {
+        const selectedSdr = formData.sdr_responsavel
+        const sdrChanged = selectedSdr && selectedSdr !== (selectedAgendamento.sdr_responsavel || "")
+
+        if (sdrChanged) {
+          const sdrUpdated = await updateAgendamentoSdr(selectedAgendamento, selectedSdr)
+          if (!sdrUpdated) {
+            throw new Error("Nao foi possivel sincronizar o SDR do lead.")
+          }
+        }
+
         console.log("[v0] Save successful")
 
         if (hasRequiredFields && currentUser) {
@@ -1625,6 +1645,26 @@ export function AgendamentosKanban() {
                         {vendedores.map((v) => (
                           <SelectItem key={v.id} value={v.nome_usuario}>
                             {v.nome_usuario}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">SDR responsável</label>
+                    <Select
+                      value={formData.sdr_responsavel}
+                      onValueChange={(value) => setFormData((prev) => ({ ...prev, sdr_responsavel: value }))}
+                      disabled={!userCanEdit && !isSdr}
+                    >
+                      <SelectTrigger className="mt-1">
+                        <SelectValue placeholder="Selecione um SDR" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {sdrs.map((sdr) => (
+                          <SelectItem key={sdr.id} value={sdr.nome_usuario}>
+                            {sdr.nome_usuario}
                           </SelectItem>
                         ))}
                       </SelectContent>

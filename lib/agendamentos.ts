@@ -355,6 +355,52 @@ export async function updateAgendamento(id: number, updates: Partial<Agendamento
   }
 }
 
+export async function updateAgendamentoSdr(
+  agendamento: Pick<Agendamento, "id" | "id_lead" | "id_empresa" | "sdr_responsavel">,
+  newSdr: string,
+): Promise<boolean> {
+  const supabase = createClient()
+  const normalizedSdr = newSdr.trim()
+  if (!normalizedSdr) return false
+
+  const { error: agendamentoError } = await supabase
+    .from("AGENDAMENTOS")
+    .update({ sdr_responsavel: normalizedSdr, updated_at: new Date().toISOString() })
+    .eq("id", agendamento.id)
+    .eq("id_empresa", agendamento.id_empresa)
+
+  if (agendamentoError) {
+    console.error("Error updating appointment SDR:", agendamentoError)
+    return false
+  }
+
+  if (!agendamento.id_lead) return true
+
+  const { error: leadError } = await supabase
+    .from("BASE_DE_LEADS")
+    .update({ sdr_responsavel: normalizedSdr, updated_at: new Date().toISOString() })
+    .eq("id", agendamento.id_lead)
+    .eq("id_empresa", agendamento.id_empresa)
+
+  if (!leadError) return true
+
+  console.error("Error syncing lead SDR; reverting appointment SDR:", leadError)
+  const { error: rollbackError } = await supabase
+    .from("AGENDAMENTOS")
+    .update({
+      sdr_responsavel: agendamento.sdr_responsavel || null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", agendamento.id)
+    .eq("id_empresa", agendamento.id_empresa)
+
+  if (rollbackError) {
+    console.error("Error reverting appointment SDR:", rollbackError)
+  }
+
+  return false
+}
+
 export async function updateAgendamentoStage(id: number, novoEstagio: string): Promise<boolean> {
   const supabase = createClient()
   const { data: agendamento } = await supabase.from("AGENDAMENTOS").select("*").eq("id", id).single()

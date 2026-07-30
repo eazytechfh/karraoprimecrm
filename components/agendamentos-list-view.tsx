@@ -18,6 +18,8 @@ import {
   deleteAgendamentos,
   deleteAgendamento,
   getVendedores,
+  getSdrs,
+  updateAgendamentoSdr,
   sendFollowUpWebhook,
   sendMessageWebhook,
   formatAgendamentoDate,
@@ -89,6 +91,7 @@ export function AgendamentosListView() {
 
   const [selectedAgendamento, setSelectedAgendamento] = useState<Agendamento | null>(null)
   const [vendedores, setVendedores] = useState<Vendedor[]>([])
+  const [sdrs, setSdrs] = useState<Vendedor[]>([])
   const [currentUser, setCurrentUser] = useState<User | null>(null)
   const [userCanEdit, setUserCanEdit] = useState(false)
   const [isSdr, setIsSdr] = useState(false)
@@ -98,6 +101,7 @@ export function AgendamentosListView() {
     data_agendamento: "",
     hora_agendamento: "",
     id_vendedor: "",
+    sdr_responsavel: "",
     observacoes: "",
     realizou_visita: false,
     ganho: false,
@@ -166,12 +170,14 @@ export function AgendamentosListView() {
   const loadData = async () => {
     const user = getCurrentUser()
     if (user) {
-      const [agendamentosData, vendedoresData] = await Promise.all([
+      const [agendamentosData, vendedoresData, sdrsData] = await Promise.all([
         getAgendamentos(user.id_empresa),
         getVendedores(user.id_empresa),
+        getSdrs(user.id_empresa),
       ])
       setAgendamentos(agendamentosData)
       setVendedores(vendedoresData)
+      setSdrs(sdrsData)
     }
     setLoading(false)
   }
@@ -309,6 +315,7 @@ export function AgendamentosListView() {
       data_agendamento: agendamento.data_agendamento || "",
       hora_agendamento: agendamento.hora_agendamento || "",
       id_vendedor: agendamento.id_vendedor?.toString() || "",
+      sdr_responsavel: agendamento.sdr_responsavel || "",
       observacoes: parsed.cleanObservacoes || "",
       realizou_visita: isRealizouVisita,
       ganho: isGanho,
@@ -325,7 +332,7 @@ export function AgendamentosListView() {
       estagio_agendamento = "visita_realizada"
     }
 
-    await updateAgendamento(selectedAgendamento.id, {
+    const updated = await updateAgendamento(selectedAgendamento.id, {
       modelo_veiculo: formData.modelo_veiculo,
       data_agendamento: formData.data_agendamento,
       hora_agendamento: formData.hora_agendamento,
@@ -334,6 +341,22 @@ export function AgendamentosListView() {
       observacoes: buildObservacoesWithCheckboxFlags(formData.observacoes, formData.realizou_visita, formData.ganho),
       estagio_agendamento,
     })
+
+    if (!updated) {
+      setActionMessage({ type: "error", text: "Não foi possível salvar o agendamento." })
+      return
+    }
+
+    if (
+      formData.sdr_responsavel &&
+      formData.sdr_responsavel !== (selectedAgendamento.sdr_responsavel || "")
+    ) {
+      const sdrUpdated = await updateAgendamentoSdr(selectedAgendamento, formData.sdr_responsavel)
+      if (!sdrUpdated) {
+        setActionMessage({ type: "error", text: "Não foi possível sincronizar o SDR do lead." })
+        return
+      }
+    }
 
     await loadData()
     setSelectedAgendamento(null)
@@ -798,6 +821,26 @@ export function AgendamentosListView() {
                     {vendedores.map((v) => (
                       <SelectItem key={v.id} value={v.id.toString()}>
                         {v.nome_usuario}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-gray-700">SDR responsável</label>
+                <Select
+                  value={formData.sdr_responsavel}
+                  onValueChange={(value) => setFormData({ ...formData, sdr_responsavel: value })}
+                  disabled={!userCanEdit && !isSdr}
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Selecione um SDR" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {sdrs.map((sdr) => (
+                      <SelectItem key={sdr.id} value={sdr.nome_usuario}>
+                        {sdr.nome_usuario}
                       </SelectItem>
                     ))}
                   </SelectContent>
